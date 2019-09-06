@@ -41,6 +41,14 @@ config SPI_3
 	default y
 
 endif # SPI
+#----------------------------	QSPI 
+if QSPI
+
+config QSPI_NRF52840
+	default y
+
+endif # QSPI
+#----------------------------	QSPI 
 
 if USB
 

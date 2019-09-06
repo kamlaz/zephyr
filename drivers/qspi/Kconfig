@@ -1,0 +1,87 @@
+# Kconfig - QSPI driver configuration options
+
+#
+# Copyright (c) 2015-2016 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+#
+# QSPI Drivers
+#
+menuconfig QSPI
+	bool "QSPI hardware bus support"
+	select HAS_DTS_QSPI
+	help
+	  Enable support for the QSPI hardware bus.
+
+if QSPI
+
+config QSPI_ASYNC
+	bool "Enable Asynchronous call support"
+	select POLL
+	help
+	  This option enables the asynchronous API calls.
+
+config QSPI_SLAVE
+	bool "Enable Slave support [EXPERIMENTAL]"
+	help
+	  Enables Driver QSPI slave operations. Slave support depends
+	  on the driver and the hardware it runs on.
+
+config QSPI_INIT_PRIORITY
+	int "Init priority"
+	default 70
+	help
+	  Device driver initialization priority.
+
+module = QSPI
+module-str = qspi
+source "subsys/logging/Kconfig.template.log_config"
+
+
+config	QSPI_0
+	bool "QSPI port 0"
+	help
+	  Enable QSPI controller port 0.
+
+if QSPI_0
+
+config QSPI_0_OP_MODES
+	int "Port 0 supported operation modes (master/slave/both)"
+	default 1
+	range 1 3
+	help
+	  This sets the supported operation modes at runtime, by the QSPI
+	  port 0, where:
+	  1 is MASTER mode only (default)
+	  2 is SLAVE mode only
+	  3 is both modes are available.
+
+endif # QSPI_0
+
+config QSPI_1
+	bool "QSPI port 1"
+	help
+	  Enable QSPI controller port 1.
+
+
+#source "drivers/spi/Kconfig.stm32"
+
+#source "drivers/spi/Kconfig.dw"
+
+#source "drivers/spi/Kconfig.mcux_dspi"
+
+#source "drivers/spi/Kconfig.mcux_lpspi"
+
+#source "drivers/spi/Kconfig.sam"
+
+#source "drivers/spi/Kconfig.sam0"
+
+#source "drivers/spi/Kconfig.sifive"
+
+source "drivers/spi/Kconfig.nrfx"
+
+#source "drivers/spi/Kconfig.cc13xx_cc26xx"
+
+endif # QSPI
