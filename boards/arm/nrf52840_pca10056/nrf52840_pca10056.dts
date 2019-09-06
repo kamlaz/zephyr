@@ -213,7 +213,17 @@ arduino_spi: &spi3 {
 	miso-pin = <46>;
 	mosi-pin = <45>;
 };
-
+/*---------------------------	QSPI */
+&qspi0 {
+	status = "okay";
+	csn-pin = <17>;
+	sck-pin = <19>;
+	io00-pin = <20>;
+	io01-pin = <21>;
+	io02-pin = <22>;
+	io03-pin = <23>;
+};
+/*---------------------------	QSPI */
 &flash0 {
 	/*
 	 * For more information, see:

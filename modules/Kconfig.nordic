@@ -176,6 +176,9 @@ config NRFX_SPI2
 	bool "Enable SPI2 instance"
 	depends on HAS_HW_NRF_SPI2
 	select NRFX_SPI
+	
+config NRFX_QSPI
+	bool
 
 config NRFX_SPIM
 	bool "Enable SPIM driver"
