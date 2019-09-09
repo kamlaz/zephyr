@@ -24,7 +24,7 @@
 		spi-1 = &spi1;
 		spi-2 = &spi2;
 		spi-3 = &spi3;
-		qspi-0 = &qspi0;
+		qspi-0 = &qspi;
 		uart-0 = &uart0;
 		uart-1 = &uart1;
 		adc-0 = &adc;
@@ -271,14 +271,14 @@
 			label = "SPI_3";
 		};
 		
-		qspi0: qspi@40029000 {
+		qspi: qspi@40029000 {
 			compatible = "nordic,nrf-qspi";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0x40029000 0x1000>;
 			interrupts = <47 1>;
 			status = "disabled";
-			label = "QSPI_0";
+			label = "QSPI";
 		};
 
 		rtc0: rtc@4000b000 {

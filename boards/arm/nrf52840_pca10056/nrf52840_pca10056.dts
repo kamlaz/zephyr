@@ -214,7 +214,7 @@ arduino_spi: &spi3 {
 	mosi-pin = <45>;
 };
 /*---------------------------	QSPI */
-&qspi0 {
+&qspi {
 	status = "okay";
 	csn-pin = <17>;
 	sck-pin = <19>;
