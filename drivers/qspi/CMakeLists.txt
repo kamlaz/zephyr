@@ -11,7 +11,7 @@ zephyr_library()
 #zephyr_library_sources_ifdef(CONFIG_SPI_SAM		spi_sam.c)
 #zephyr_library_sources_ifdef(CONFIG_SPI_SAM0		spi_sam0.c)
 #zephyr_library_sources_ifdef(CONFIG_SPI_SIFIVE		spi_sifive.c)
-zephyr_library_sources_ifdef(CONFIG_NRFX_QSPI		qspi_nrfx_qspi.c)
+zephyr_library_sources_ifdef(CONFIG_QSPI		qspi_nrfx_qspi.c)
 #zephyr_library_sources_ifdef(CONFIG_NRFX_QSPIM		qspi_nrfx_qspim.c)
 #zephyr_library_sources_ifdef(CONFIG_NRFX_QSPIS		qspi_nrfx_spis.c)
 
