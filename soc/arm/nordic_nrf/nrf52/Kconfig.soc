@@ -202,6 +202,7 @@ config SOC_NRF52833
 	select HAS_HW_NRF_SPIS0
 	select HAS_HW_NRF_SPIS1
 	select HAS_HW_NRF_SPIS2
+	select HAS_HW_NRF_QSPI0
 	select HAS_HW_NRF_SWI0
 	select HAS_HW_NRF_SWI1
 	select HAS_HW_NRF_SWI2
