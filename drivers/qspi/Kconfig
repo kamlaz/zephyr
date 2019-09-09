@@ -66,22 +66,22 @@ config QSPI_1
 	  Enable QSPI controller port 1.
 
 
-#source "drivers/spi/Kconfig.stm32"
+#source "drivers/qspi/Kconfig.stm32"
 
-#source "drivers/spi/Kconfig.dw"
+#source "drivers/qspi/Kconfig.dw"
 
-#source "drivers/spi/Kconfig.mcux_dspi"
+#source "drivers/qspi/Kconfig.mcux_dspi"
 
-#source "drivers/spi/Kconfig.mcux_lpspi"
+#source "drivers/qspi/Kconfig.mcux_lpspi"
 
-#source "drivers/spi/Kconfig.sam"
+#source "drivers/qspi/Kconfig.sam"
 
-#source "drivers/spi/Kconfig.sam0"
+#source "drivers/qspi/Kconfig.sam0"
 
-#source "drivers/spi/Kconfig.sifive"
+#source "drivers/qspi/Kconfig.sifive"
 
-source "drivers/spi/Kconfig.nrfx"
+source "drivers/qspi/Kconfig.nrfx"
 
-#source "drivers/spi/Kconfig.cc13xx_cc26xx"
+#source "drivers/qspi/Kconfig.cc13xx_cc26xx"
 
 endif # QSPI

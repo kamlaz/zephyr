@@ -1,0 +1,19 @@
+# Copyright (c) 2018, I-SENSE group of ICCS
+# SPDX-License-Identifier: Apache-2.0
+
+# Common fields for SPI devices
+
+include: base.yaml
+
+parent:
+    bus: qspi
+
+properties:
+    reg:
+      required: true
+    spi-max-frequency:
+      type: int
+      required: true
+      description: Maximum clock frequency of device's QSPI interface in Hz
+    label:
+      required: true

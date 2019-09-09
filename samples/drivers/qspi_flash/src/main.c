@@ -6,7 +6,7 @@
 
 #include <zephyr.h>
 //#include <drivers/flash.h>
-//#include <drivers/qspi.h>
+#include <drivers/qspi.h>
 #include <device.h>
 #include <stdio.h>
 
