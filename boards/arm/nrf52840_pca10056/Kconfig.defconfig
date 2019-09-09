@@ -44,7 +44,7 @@ endif # SPI
 #----------------------------	QSPI 
 if QSPI
 
-config QSPI_NRF52840
+config QSPI_0
 	default y
 
 endif # QSPI

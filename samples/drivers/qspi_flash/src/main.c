@@ -5,12 +5,14 @@
  */
 
 #include <zephyr.h>
-#include <drivers/flash.h>
+//#include <drivers/flash.h>
+//#include <drivers/qspi.h>
 #include <device.h>
 #include <stdio.h>
 
 #if (CONFIG_SPI_FLASH_W25QXXDV - 0)
 /* NB: W25Q16DV is a JEDEC spi-nor device, but has a separate driver. */
+/*
 #define FLASH_DEVICE CONFIG_SPI_FLASH_W25QXXDV_DRV_NAME
 #define FLASH_NAME "W25QXXDV"
 #elif (CONFIG_SPI_NOR - 0) || defined(DT_INST_0_JEDEC_SPI_NOR_LABEL)
@@ -25,9 +27,10 @@
 #define TEST_DATA_BYTE_0         0x55
 #define TEST_DATA_BYTE_1         0xaa
 #define TEST_DATA_LEN            2
-
+*/
 void main(void)
 {
+	/*
 	struct device *flash_dev;
 	u8_t buf[TEST_DATA_LEN];
 
@@ -40,12 +43,13 @@ void main(void)
 		printf("SPI flash driver %s was not found!\n", FLASH_DEVICE);
 		return;
 	}
-
+	*/
 	/* Write protection needs to be disabled before each write or
 	 * erase, since the flash component turns on write protection
 	 * automatically after completion of write and erase
 	 * operations.
 	 */
+	/*
 	printf("\nTest 1: Flash erase\n");
 	flash_write_protection_set(flash_dev, false);
 	if (flash_erase(flash_dev,
@@ -80,4 +84,5 @@ void main(void)
 	} else {
 		printf("   Data read does not match with data written!!\n");
 	}
+	*/
 }

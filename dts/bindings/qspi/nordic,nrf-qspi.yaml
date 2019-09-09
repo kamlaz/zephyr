@@ -1,0 +1,48 @@
+#
+# Copyright (c) 2018 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: BSD-5-Clause-Nordic
+#
+
+title: Nordic nRF Family QSPI Master node
+
+description: >
+    This is a representation of the Nordic nRF QSPI node
+
+inherits:
+    !include qspi.yaml
+
+properties:
+    compatible:
+      constraint: "nordic,nrf-qspi"
+
+    reg:
+      category: required
+
+    interrupts:
+      category: required
+
+    sck-pin:
+      type: int
+      category: required
+      description: SCK pin
+
+    io00-pin:
+      type: int
+      category: required
+      description: IO00 pin
+
+    io01-pin:
+      type: int
+      category: required
+      description: IO01 pin
+
+    io02-pin:
+      type: int
+      category: required
+      description: IO02 pin
+
+    io03-pin:
+      type: int
+      category: required
+      description: IO03 pin

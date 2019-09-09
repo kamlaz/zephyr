@@ -271,11 +271,11 @@
 			label = "SPI_3";
 		};
 		
-		qspi0: spi@4002b000 {
-			compatible = "nordic,nrf-spi";
+		qspi0: qspi@40029000 {
+			compatible = "nordic,nrf-qspi";
 			#address-cells = <1>;
 			#size-cells = <0>;
-			reg = <0x4002b000 0x1000>;
+			reg = <0x40029000 0x1000>;
 			interrupts = <47 1>;
 			status = "disabled";
 			label = "QSPI_0";
