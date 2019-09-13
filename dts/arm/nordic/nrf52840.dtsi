@@ -276,7 +276,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0x40029000 0x1000>;
-			interrupts = <47 1>;
+			interrupts = <41 1>;
 			status = "disabled";
 			label = "QSPI";
 		};
