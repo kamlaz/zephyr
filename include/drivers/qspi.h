@@ -28,14 +28,6 @@ extern "C" {
 #endif
 
 /**
- * @brief QSPI operational mode
- */
-#define QSPI_OP_MODE_MASTER	0
-#define QSPI_OP_MODE_SLAVE	BIT(0)
-#define QSPI_OP_MODE_MASK	0x1
-#define QSPI_OP_MODE_GET(_operation_) ((_operation_) & QSPI_OP_MODE_MASK)
-
-/**
  * @brief QSPI Polarity & Phase Modes
  */
 
@@ -44,7 +36,7 @@ extern "C" {
  * and active state will be 0. If untouched, the inverse will be true
  * which is the default.
  */
-#define QSPI_MODE_CPOL		BIT(1)
+#define QSPI_MODE_CPOL		BIT(0)
 
 /**
  * Clock Phase: this dictates when is the data captured, and depends
@@ -53,69 +45,82 @@ extern "C" {
  * this bit is not set (default). This is fully reversed if CPOL is
  * not set.
  */
-#define QSPI_MODE_CPHA		BIT(2)
+#define QSPI_MODE_CPHA		BIT(1)
 
 /**
- * Whatever data is transmitted is looped-back to the receiving buffer of
- * the controller. This is fully controller dependent as some may not
- * support this, and can be used for testing purposes only.
+ * @brief QSPI CS delay.
  */
-#define QSPI_MODE_LOOP		BIT(3)
-
-#define QSPI_MODE_MASK		(0xE)
-#define QSPI_MODE_GET(_mode_)			\
-	((_mode_) & QSPI_MODE_MASK)
 
 /**
- * @brief QSPI Transfer modes (host controller dependent)
+ * No of clock cycles when CS must remain high between two read/write
+ * operations
  */
-#define QSPI_TRANSFER_MSB	(0)
-#define QSPI_TRANSFER_LSB	BIT(4)
+#define QSPI_CS_DELAY_FIELD_SIZE	0xFF
+#define QSPI_CS_DELAY_SHIFT	(2)
+#define QSPI_CS_DELAY_MASK	(QSPI_CS_DELAY_FIELD_SIZE << QSPI_CS_DELAY_SHIFT)
+#define QSPI_CS_DELAY_GET(_operation_)					\
+	(((_operation_) & QSPI_CS_DELAY_MASK) >> QSPI_CS_DELAY_SHIFT)
+
+#define QSPI_CS_DELAY_SET(_cs_delay_)		\
+	((_cs_delay_) << QSPI_CS_DELAY_SHIFT)
 
 /**
- * @brief QSPI word size
+ * @brief QSPI Read data lines
  */
-#define QSPI_WORD_SIZE_SHIFT	(5)
-#define QSPI_WORD_SIZE_MASK	(0x3F << QSPI_WORD_SIZE_SHIFT)
-#define QSPI_WORD_SIZE_GET(_operation_)					\
-	(((_operation_) & QSPI_WORD_SIZE_MASK) >> QSPI_WORD_SIZE_SHIFT)
-
-#define QSPI_WORD_SET(_word_size_)		\
-	((_word_size_) << QSPI_WORD_SIZE_SHIFT)
 
 /**
- * @brief QSPI MISO lines
- *
- * Some controllers support dual, quad or octal MISO lines connected to slaves.
- * Default is single, which is the case most of the time.
+ * No of clock cycles when CS must remain high between two read/write
+ * operations
+ * Dual data line SPI. READ2O (opcode 0x3B).
+ * Dual data line SPI. READ2IO (opcode 0xBB).
+ * Quad data line SPI. READ4O (opcode 0x6B).
+ * Quad data line SPI. READ4IO (opcode 0xEB).
  */
-#define QSPI_LINES_SINGLE	(0 << 11)
-#define QSPI_LINES_DUAL		(1 << 11)
-#define QSPI_LINES_QUAD		(2 << 11)
-#define QSPI_LINES_OCTAL		(3 << 11)
+#define QSPI_DATA_LINES_FIELD_SIZE	0x02
+#define QSPI_DATA_LINES_SHIFT	(10)
+#define QSPI_DATA_LINES_MASK	(QSPI_DATA_LINES_FIELD_SIZE << QSPI_DATA_LINES_SHIFT)
+#define QSPI_DATA_LINES_GET(_operation_)					\
+	(((_operation_) & QSPI_DATA_LINES_MASK) >> QSPI_DATA_LINES_SHIFT)
 
-#define QSPI_LINES_MASK		(0x3 << 11)
+#define QSPI_DATA_LINES_SET(_read_data_lines_)		\
+	((_read_data_lines_) << QSPI_DATA_LINES_SHIFT)
+
 
 /**
- * @brief Specific QSPI devices control bits
+ * @brief QSPI Address configuration
  */
-/* Requests - if possible - to keep CS asserted after the transaction */
-#define QSPI_HOLD_ON_CS		BIT(13)
-/* Keep the device locked after the transaction for the current config.
- * Use this with extreme caution (see qspi_release() below) as it will
- * prevent other callers to access the QSPI device until qspi_release() is
- * properly called.
- */
-#define QSPI_LOCK_ON		BIT(14)
 
-/* Active high logic on CS - Usually, and by default, CS logic is active
- * low. However, some devices may require the reverse logic: active high.
- * This bit will request the controller to use that logic. Note that not
- * all controllers are able to handle that natively. In this case deferring
- * the CS control to a gpio line through struct qspi_cs_control would be
- * the solution.
+/**
+ * No of clock cycles when CS must remain high between two read/write
+ * operations
+ * 0x00	-	8 bit address
+ * 0x01	-	16 bit address
+ * 0x02	-	24 bit address
+ * 0x03	-	32 bit address
  */
-#define QSPI_CS_ACTIVE_HIGH	BIT(15)
+#define QSPI_ADDRESS_MODE_8BIT	0x00
+#define QSPI_ADDRESS_MODE_16BIT	0x01
+#define QSPI_ADDRESS_MODE_24BIT	0x02
+#define QSPI_ADDRESS_MODE_32BIT	0x03
+
+#define QSPI_ADDRESS_MODE_FIELD_SIZE	0x02
+#define QSPI_ADDRESS_MODE_SHIFT	(12)
+#define QSPI_ADDRESS_MODE_MASK	(QSPI_ADDRESS_MODE_FIELD_SIZE << QSPI_ADDRESS_MODE_SHIFT)
+#define QSPI_ADDRESS_MODE_GET(_operation_)					\
+	(((_operation_) & QSPI_ADDRESS_MODE_MASK) >> QSPI_ADDRESS_MODE_SHIFT)
+
+#define QSPI_ADDRESS_MODE_SET(_address_)		\
+	((_address_) << QSPI_ADDRESS_MODE_SHIFT)
+
+/**
+ * @brief QSPI RFU bits
+ */
+
+/**
+ * Not used. Write/read does not impact functionality of the driver.
+ */
+#define QSPI_RFU_14		BIT(14)
+#define QSPI_RFU_15		BIT(15)
 
 /**
  * @brief QSPI Chip Select control structure
@@ -142,14 +147,11 @@ struct qspi_cs_control {
  * @param frequency is the bus frequency in Hertz
  * @param operation is a bit field with the following parts:
  *
- *     operational mode    [ 0 ]       - master or slave.
- *     mode                [ 1 : 3 ]   - Polarity, phase and loop mode.
- *     transfer            [ 4 ]       - LSB or MSB first.
- *     word_size           [ 5 : 10 ]  - Size of a data frame in bits.
- *     lines               [ 11 : 12 ] - MISO lines: Single/Dual/Quad/Octal.
- *     cs_hold             [ 13 ]      - Hold on the CS line if possible.
- *     lock_on             [ 14 ]      - Keep resource locked for the caller.
- *     cs_active_high      [ 15 ]      - Active high CS logic.
+ *     mode		   		   [ 0 : 1 ]   - Polarity, phase
+ *     cs_delay            [ 2 : 9 ]   - CS delay. No of clock cycles when CS must remain high between two read/write operations
+ *     data_lines 	       [ 10 : 11 ] - Defines how many lines will be used for read operation
+ *     address             [ 12 : 13 ] - Defines how many bits are used for address
+ *     RFU	               [ 14 : 15 ] - RFU
  * @param slave is the slave number from 0 to host controller slave limit.
  * @param cs is a valid pointer on a struct qspi_cs_control is CS line is
  *    emulated through a gpio line, or NULL otherwise.
@@ -158,7 +160,7 @@ struct qspi_cs_control {
  * transceive call. Rest of the attributes are not meant to be tweaked.
  */
 struct qspi_config {
-	u32_t		frequency;
+	u32_t		prescaler;
 	u16_t		operation;
 	u16_t		slave;
 
@@ -271,6 +273,7 @@ static inline int z_impl_qspi_transceive(struct device *dev,
  * @param dev Pointer to the device structure for the driver instance
  * @param config Pointer to a valid qspi_config structure instance.
  * @param rx_bufs Buffer array where data to be read will be written to.
+ * @param address Address from the data will be read
  *
  * @retval 0 If successful, negative errno code otherwise.
  *
@@ -278,7 +281,8 @@ static inline int z_impl_qspi_transceive(struct device *dev,
  */
 static inline int qspi_read(struct device *dev,
 			   const struct qspi_config *config,
-			   const struct qspi_buf_set *rx_bufs)
+			   const struct qspi_buf_set *rx_bufs,
+			   u32_t address)
 {
 	return qspi_transceive(dev, config, NULL, rx_bufs);
 }
@@ -291,6 +295,7 @@ static inline int qspi_read(struct device *dev,
  * @param dev Pointer to the device structure for the driver instance
  * @param config Pointer to a valid qspi_config structure instance.
  * @param tx_bufs Buffer array where data to be sent originates from.
+ * @param address Address where the data will be written
  *
  * @retval 0 If successful, negative errno code otherwise.
  *
@@ -298,7 +303,8 @@ static inline int qspi_read(struct device *dev,
  */
 static inline int qspi_write(struct device *dev,
 			    const struct qspi_config *config,
-			    const struct qspi_buf_set *tx_bufs)
+			    const struct qspi_buf_set *tx_bufs,
+				u32_t address)
 {
 	return qspi_transceive(dev, config, tx_bufs, NULL);
 }
