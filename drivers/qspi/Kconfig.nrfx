@@ -38,6 +38,13 @@ if QSPI_0 && (SOC_NRF52810 || \
 choice
 	prompt "QSPI Port 0 Driver type"
 
+config QSPI_NRF_QSPI
+	bool "nRF QSPI"
+	depends on HAS_HW_NRF_QSPI
+	select NRFX_QSPI
+	help
+	  Enable nRF QSPI Master without EasyDMA on port 0.
+
 config QSPI_0_NRF_QSPI
 	bool "nRF QSPI 0"
 	depends on HAS_HW_NRF_QSPI0

@@ -28,8 +28,34 @@
 #define TEST_DATA_BYTE_1         0xaa
 #define TEST_DATA_LEN            2
 */
+
+#define FLASH_DEVICE CONFIG_QSPI
+
 void main(void)
 {
+	printf("\nTest 1: Flash erase\n");
+	uint8_t tx[16]={1,2,3,4,5,6,7,8,1,2,3,4,5,6,7,8};
+	uint8_t rx[16]={0};
+	struct device *ctx;
+//	ctx = device_get_binding(FLASH_DEVICE);
+
+	struct device *qspi;
+	struct qspi_config qspi_cfg;
+	int err;
+
+	printk("discochlosta!!\n");
+	//	QSPI
+	//CONFIG_QSPI_NRF_QSPI
+	//DT_SPI_1_NAME
+	qspi = device_get_binding(CONFIG_QSPI_NRFX);
+	if (!qspi) {
+		printk("Could not find SPI driver\n");
+//		return;
+	}
+
+
+	qspi_transceive(qspi, &qspi_cfg, &tx, &rx);
+//	qspi_transceive(&ctx->device, ctx->qspi, &tx, &rx);
 	/*
 	struct device *flash_dev;
 	u8_t buf[TEST_DATA_LEN];
