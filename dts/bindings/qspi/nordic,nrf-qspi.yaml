@@ -17,6 +17,11 @@ properties:
     interrupts:
       required: true
 
+    csn-pin:
+      type: int
+      required: true
+      description: CSN pin
+
     sck-pin:
       type: int
       required: true
