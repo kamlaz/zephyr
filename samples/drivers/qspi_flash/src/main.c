@@ -47,7 +47,7 @@ void main(void)
 	//	QSPI
 	//CONFIG_QSPI_NRF_QSPI
 	//DT_SPI_1_NAME
-	qspi = device_get_binding(CONFIG_QSPI_NRFX);
+	qspi = device_get_binding(DT_NORDIC_NRF_QSPI_QSPI_0_LABEL);
 	if (!qspi) {
 		printk("Could not find SPI driver\n");
 //		return;
