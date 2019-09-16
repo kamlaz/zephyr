@@ -121,27 +121,43 @@ static void qspi_handler(nrfx_qspi_evt_t event, void * p_context)
 static int configure(struct device *dev,
 		     const struct qspi_config *qspi_cfg)
 {
-//	printf("\nConfiguration...");
-//	struct qspi_context *ctx = &get_dev_data(dev)->ctx;
-//	nrfx_qspi_config_t * p_config = &get_dev_config(dev)->config;
+	printf("\n--> configure");
+	struct qspi_context *ctx = &get_dev_data(dev)->ctx;
+	nrfx_qspi_config_t * p_config = &get_dev_config(dev)->config;
+
+//	const nrfx_qspi_t *qspi = &get_dev_config(dev)->qspi;
 //
-////	const nrfx_qspi_t *qspi = &get_dev_config(dev)->qspi;
-////
-//	if (qspi_context_configured(ctx, qspi_cfg)) {
-//		/* Already configured. No need to do it again. */
-//		return 0;
-//	}
-//	/* Checking input parameters */
-//	if (QSPI_CS_DELAY_GET(qspi_cfg->operation) > 0xFF) {
-//		LOG_ERR("CS delay not supported");
-//		return -EINVAL;
-//	}
-//
+	if (qspi_context_configured(ctx, qspi_cfg)) {
+		/* Already configured. No need to do it again. */
+		return 0;
+	}
+	/* Checking input parameters */
+	if (QSPI_CS_DELAY_GET(qspi_cfg->operation) > 0xFF) {
+		LOG_ERR("CS delay not supported");
+		printf("\n<-- configure : CS");
+		return -EINVAL;
+	}
+
 //	if (QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) != (QSPI_ADDRESS_MODE_24BIT )
 //			|| QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) != (QSPI_ADDRESS_MODE_32BIT)) {
 //			LOG_ERR("Address mode not supported.");
+//			printf("\n<-- configure : ADDRESS");
 //			return -EINVAL;
 //	}
+
+
+		if (QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) == QSPI_ADDRESS_MODE_24BIT) {
+				printf("\n24 BIT ADDR");
+
+		}
+		else if (QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) == QSPI_ADDRESS_MODE_32BIT){
+			printf("\n32 BIT ADDR");
+		}
+		else{
+			LOG_ERR("Address modes other than 24 or 32 bits are not supported");
+			printf("\nNONE ADDRESS");
+			return -EINVAL;
+		}
 //
 //	/* Input parameters OK - initialise QSPI */
 //	ctx->config = qspi_cfg;
@@ -188,6 +204,7 @@ static int configure(struct device *dev,
 //	nrf_qspi_frequency_set(qspi->p_reg,
 //			      get_nrf_qspi_frequency(qspi_cfg->frequency));
 //
+	printf("\n<-- configure : OK");
 	return 0;
 }
 
@@ -230,26 +247,25 @@ static int transceive(struct device *dev,
 		      const struct qspi_buf_set *tx_bufs,
 		      const struct qspi_buf_set *rx_bufs)
 {
-	printf("\nDUpa");
-//	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
-//	int error;
-//
-//	error = configure(dev, qspi_cfg);
-//	if (error == 0) {
-//		dev_data->busy = true;
-//
-//		qspi_context_buffers_setup(&dev_data->ctx, tx_bufs, rx_bufs, 1);
-//		qspi_context_cs_control(&dev_data->ctx, true);
-//
-//		transfer_next_chunk(dev);
-//
-//		error = qspi_context_wait_for_completion(&dev_data->ctx);
-//	}
-//
-//	qspi_context_release(&dev_data->ctx, error);
-//
-//	return error;
-	return 0;
+	printf("\n--> transceive");
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+	int error;
+
+	error = configure(dev, qspi_cfg);
+	if (error == 0) {
+		dev_data->busy = true;
+
+		qspi_context_buffers_setup(&dev_data->ctx, tx_bufs, rx_bufs, 1);
+		qspi_context_cs_control(&dev_data->ctx, true);
+
+		transfer_next_chunk(dev);
+
+		error = qspi_context_wait_for_completion(&dev_data->ctx);
+	}
+
+	qspi_context_release(&dev_data->ctx, error);
+	printf("\n--> transceive : %d", error);
+	return error;
 }
 
 static int qspi_nrfx_transceive(struct device *dev,
@@ -258,8 +274,8 @@ static int qspi_nrfx_transceive(struct device *dev,
 			       const struct qspi_buf_set *rx_bufs)
 {
 	printf("CHlosta");
-//	qspi_context_lock(&get_dev_data(dev)->ctx, false, NULL);
-//	return transceive(dev, qspi_cfg, tx_bufs, rx_bufs);
+	qspi_context_lock(&get_dev_data(dev)->ctx, false, NULL);
+	return transceive(dev, qspi_cfg, tx_bufs, rx_bufs);
 	return 0;
 }
 
@@ -320,6 +336,7 @@ static void event_handler(const nrfx_qspi_evt_t *p_event, void *p_context)
 
 static int init_qspi(struct device *dev)
 {
+	printk("\nPotezna chlosta inicjalizacji");
 	/* This sets only default values of frequency, mode and bit order.
 	 * The proper ones are set in configure() when a transfer is started.
 	 */
@@ -383,6 +400,7 @@ static int qspi_nrfx_pm_control(struct device *dev, u32_t ctrl_command,
 
 //		.qspi = NRFX_QSPI_INSTANCE(0),
 //nrfx_qspi_irq_handler
+//NRFX_QSPI_CONFIG_ADDRMODE
 #define QSPI_NRFX_QSPI_DEVICE(void)					       \
 	static int qspi_init(struct device *dev)			       \
 	{								       \
@@ -400,18 +418,18 @@ static int qspi_nrfx_pm_control(struct device *dev, u32_t ctrl_command,
 		.config = {						       \
 			.xip_offset  = NRFX_QSPI_CONFIG_XIP_OFFSET,                         \
 			.pins = {                                                           \
-			   .sck_pin     = NRFX_QSPI_PIN_SCK,                                \
-			   .csn_pin     = NRFX_QSPI_PIN_CSN,                                \
-			   .io0_pin     = NRFX_QSPI_PIN_IO0,                                \
-			   .io1_pin     = NRFX_QSPI_PIN_IO1,                                \
-			   .io2_pin     = NRFX_QSPI_PIN_IO2,                                \
-			   .io3_pin     = NRFX_QSPI_PIN_IO3,                                \
+			   .sck_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_SCK_PIN,                                \
+			   .csn_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_CSN_PIN,                                \
+			   .io0_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO00_PIN,                                \
+			   .io1_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO01_PIN,                                \
+			   .io2_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO02_PIN,                                \
+			   .io3_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO03_PIN,                                \
 			},                                                                  \
 			.irq_priority   = (uint8_t)NRFX_QSPI_CONFIG_IRQ_PRIORITY,           \
 			.prot_if = {                                                        \
 				.readoc     = (nrf_qspi_readoc_t)NRFX_QSPI_CONFIG_READOC,       \
 				.writeoc    = (nrf_qspi_writeoc_t)NRFX_QSPI_CONFIG_WRITEOC,     \
-				.addrmode   = (nrf_qspi_addrmode_t)NRFX_QSPI_CONFIG_ADDRMODE,   \
+				.addrmode   = (nrf_qspi_addrmode_t)QSPI_ADDRESS_MODE_24BIT,   \
 				.dpmconfig  = false,                                            \
 			},                                                                  \
 			.phy_if = {                                                         \
