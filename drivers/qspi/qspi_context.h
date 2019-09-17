@@ -45,6 +45,7 @@ struct qspi_context {
 	u8_t *rx_buf;
 	size_t rx_len;
 
+	u32_t address;
 //#ifdef CONFIG_QSPI_SLAVE
 //	int recv_frames;
 //#endif /* CONFIG_QSPI_SLAVE */
@@ -220,6 +221,7 @@ static inline
 void qspi_context_buffers_setup(struct qspi_context *ctx,
 			       const struct qspi_buf_set *tx_bufs,
 			       const struct qspi_buf_set *rx_bufs,
+				   const u32_t address,
 			       u8_t dfs)
 {
 	LOG_DBG("tx_bufs %p - rx_bufs %p - %u", tx_bufs, rx_bufs, dfs);
@@ -247,6 +249,8 @@ void qspi_context_buffers_setup(struct qspi_context *ctx,
 		ctx->rx_buf = NULL;
 		ctx->rx_len = 0;
 	}
+
+	ctx->address = address;
 
 	ctx->sync_status = 0;
 
