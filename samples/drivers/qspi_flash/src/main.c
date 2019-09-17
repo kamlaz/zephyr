@@ -3,10 +3,11 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
+/* Includes ------------------------------------------------------------------*/
 #include <zephyr.h>
 //#include <drivers/flash.h>
 #include <drivers/qspi.h>
+#include <nrfx_qspi.h>
 #include <device.h>
 #include <stdio.h>
 
@@ -28,87 +29,79 @@
 #define TEST_DATA_BYTE_1         0xaa
 #define TEST_DATA_LEN            2
 */
+/* Private typedef -----------------------------------------------------------*/
+/* Private define ------------------------------------------------------------*/
 
 #define FLASH_DEVICE CONFIG_QSPI
+/* Private macro -------------------------------------------------------------*/
+/* Private variables ---------------------------------------------------------*/
+/* Private function prototypes -----------------------------------------------*/
+static void qspi_configure(struct qspi_config * pCfg);
+void print_buffer(struct qspi_buf * buffer, uint8_t * txbuff);
 
+/* Private functions ---------------------------------------------------------*/
 void main(void)
 {
 	printf("\nTest 1: Flash erase\n");
 	uint8_t tx[16]={1,2,3,4,5,6,7,8,1,2,3,4,5,6,7,8};
 	uint8_t rx[16]={0};
-	struct device *ctx;
-//	ctx = device_get_binding(FLASH_DEVICE);
+	uint32_t address = 0x0A;
+	/* TX BUFFER */
+	struct qspi_buf TX={
+			.buf = &tx,
+			.len = sizeof(tx)
+	};
+	struct qspi_buf_set TXbuffer={
+			.buffers = &TX,
+			.count = 1,
+	};
 
-	struct device *qspi;
-	struct qspi_config qspi_cfg;
-	int err;
+	/* RX BUFFER */
+	struct qspi_buf RX={
+			.buf = &rx,
+			.len = 16
+	};
+	struct qspi_buf_set RXbuffer={
+			.buffers = &RX,
+			.count = 1,
+	};
+
+
+	struct device *qspi;				// Defines pointer to qspi device
+	struct qspi_config qspi_cfg;		// Config for qspi device
+
 
 	printk("discochlosta!!\n");
-	//	QSPI
-	//CONFIG_QSPI_NRF_QSPI
-	//DT_SPI_1_NAME
+	/* Get binding */
 	qspi = device_get_binding(DT_NORDIC_NRF_QSPI_QSPI_0_LABEL);
+
+	/* Check acquired pointer */
 	if (!qspi) {
 		printk("Could not find SPI driver\n");
-//		return;
-	}
-
-
-	qspi_transceive(qspi, &qspi_cfg, &tx, &rx);
-//	qspi_transceive(&ctx->device, ctx->qspi, &tx, &rx);
-	/*
-	struct device *flash_dev;
-	u8_t buf[TEST_DATA_LEN];
-
-	printf("\n" FLASH_NAME " SPI flash testing\n");
-	printf("==========================\n");
-
-	flash_dev = device_get_binding(FLASH_DEVICE);
-
-	if (!flash_dev) {
-		printf("SPI flash driver %s was not found!\n", FLASH_DEVICE);
-		return;
-	}
-	*/
-	/* Write protection needs to be disabled before each write or
-	 * erase, since the flash component turns on write protection
-	 * automatically after completion of write and erase
-	 * operations.
-	 */
-	/*
-	printf("\nTest 1: Flash erase\n");
-	flash_write_protection_set(flash_dev, false);
-	if (flash_erase(flash_dev,
-			FLASH_TEST_REGION_OFFSET,
-			FLASH_SECTOR_SIZE) != 0) {
-		printf("   Flash erase failed!\n");
-	} else {
-		printf("   Flash erase succeeded!\n");
-	}
-
-	printf("\nTest 2: Flash write\n");
-	flash_write_protection_set(flash_dev, false);
-
-	buf[0] = TEST_DATA_BYTE_0;
-	buf[1] = TEST_DATA_BYTE_1;
-	printf("   Attempted to write %x %x\n", buf[0], buf[1]);
-	if (flash_write(flash_dev, FLASH_TEST_REGION_OFFSET, buf,
-	    TEST_DATA_LEN) != 0) {
-		printf("   Flash write failed!\n");
 		return;
 	}
 
-	if (flash_read(flash_dev, FLASH_TEST_REGION_OFFSET, buf,
-	    TEST_DATA_LEN) != 0) {
-		printf("   Flash read failed!\n");
-		return;
-	}
-	printf("   Data read %x %x\n", buf[0], buf[1]);
+	/* Assign config */
+	qspi_configure(&qspi_cfg);
 
-	if ((buf[0] == TEST_DATA_BYTE_0) && (buf[1] == TEST_DATA_BYTE_1)) {
-		printf("   Data read matches with data written. Good!!\n");
-	} else {
-		printf("   Data read does not match with data written!!\n");
-	}
-	*/
+	/* Write data to the external flash */
+	qspi_write(qspi, &qspi_cfg, &TXbuffer, address);
+
+	/* wait for the next sample */
+//	k_sleep(K_SECONDS(1));
+	qspi_read(qspi, &qspi_cfg, &RXbuffer, address);
+
+	printk("\n I'm Alive!");
+//	qspi_write(qspi, &qspi_cfg, &TXbuffer, address);
+
 }
+
+
+static void qspi_configure(struct qspi_config * pCfg){
+	pCfg->prescaler = NRF_QSPI_FREQ_32MDIV16;
+	pCfg->operation = (QSPI_CS_DELAY_SET(8) 							|
+					   QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)		|
+					   QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
+}
+
+

@@ -76,6 +76,10 @@ extern "C" {
  * Quad data line SPI. READ4O (opcode 0x6B).
  * Quad data line SPI. READ4IO (opcode 0xEB).
  */
+#define QSPI_DATA_LINES_SINGLE	0x01
+#define QSPI_DATA_LINES_DOUBLE	0x02
+#define QSPI_DATA_LINES_QUAD	0x03
+
 #define QSPI_DATA_LINES_FIELD_SIZE	0x03
 #define QSPI_DATA_LINES_SHIFT	(10)
 #define QSPI_DATA_LINES_MASK	(QSPI_DATA_LINES_FIELD_SIZE << QSPI_DATA_LINES_SHIFT)
@@ -159,7 +163,7 @@ struct qspi_cs_control {
  * @note Only cs_hold and lock_on can be changed between consecutive
  * transceive call. Rest of the attributes are not meant to be tweaked.
  */
-struct qspi_config {
+volatile struct qspi_config {
 	u32_t		prescaler;
 	u16_t		operation;
 	u16_t		slave;
@@ -202,6 +206,26 @@ typedef int (*qspi_api_io)(struct device *dev,
 			  const struct qspi_buf_set *rx_bufs);
 
 /**
+ * @typedef qspi_api_write
+ * @brief Callback API for I/O
+ * See qspi_transceive() for argument descriptions
+ */
+typedef int (*qspi_api_write)(struct device *dev,
+			  const struct qspi_config *config,
+			  const struct qspi_buf_set *tx_bufs,
+			  uint32_t address);
+
+/**
+ * @typedef qspi_api_read
+ * @brief Callback API for I/O
+ * See qspi_transceive() for argument descriptions
+ */
+typedef int (*qspi_api_read)(struct device *dev,
+			  const struct qspi_config *config,
+			  const struct qspi_buf_set *rx_bufs,
+			  uint32_t address);
+
+/**
  * @typedef qspi_api_io
  * @brief Callback API for asynchronous I/O
  * See qspi_transceive_async() for argument descriptions
@@ -227,6 +251,8 @@ typedef int (*qspi_api_release)(struct device *dev,
  */
 struct qspi_driver_api {
 	qspi_api_io transceive;
+	qspi_api_write write;
+	qspi_api_read read;
 #ifdef CONFIG_QSPI_ASYNC
 	qspi_api_io_async transceive_async;
 #endif /* CONFIG_QSPI_ASYNC */
@@ -279,13 +305,22 @@ static inline int z_impl_qspi_transceive(struct device *dev,
  *
  * @note This function is an helper function calling qspi_transceive.
  */
-static inline int qspi_read(struct device *dev,
-			   const struct qspi_config *config,
-			   const struct qspi_buf_set *rx_bufs,
-			   u32_t address)
+__syscall int qspi_read(struct device *dev,
+				const struct qspi_config *config,
+				const struct qspi_buf_set *rx_bufs,
+				u32_t address);
+
+static inline int z_impl_qspi_read(struct device *dev,
+				       const struct qspi_config *config,
+				       const struct qspi_buf_set *rx_bufs,
+					   u32_t address)
 {
-	return qspi_transceive(dev, config, NULL, rx_bufs);
+	const struct qspi_driver_api *api =
+		(const struct qspi_driver_api *)dev->driver_api;
+
+	return api->read(dev, config, rx_bufs, address);
 }
+
 
 /**
  * @brief Write the specified amount of data from the QSPI driver.
@@ -301,13 +336,22 @@ static inline int qspi_read(struct device *dev,
  *
  * @note This function is an helper function calling qspi_transceive.
  */
-static inline int qspi_write(struct device *dev,
-			    const struct qspi_config *config,
-			    const struct qspi_buf_set *tx_bufs,
-				u32_t address)
+__syscall int qspi_write(struct device *dev,
+				const struct qspi_config *config,
+				const struct qspi_buf_set *tx_bufs,
+				u32_t address);
+
+static inline int z_impl_qspi_write(struct device *dev,
+				       const struct qspi_config *config,
+				       const struct qspi_buf_set *tx_bufs,
+					   u32_t address)
 {
-	return qspi_transceive(dev, config, tx_bufs, NULL);
+	const struct qspi_driver_api *api =
+		(const struct qspi_driver_api *)dev->driver_api;
+
+	return api->write(dev, config, tx_bufs, address);
 }
+
 
 #ifdef CONFIG_QSPI_ASYNC
 /**
