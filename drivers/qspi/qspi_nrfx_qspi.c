@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
+/* Includes ------------------------------------------------------------------*/
 #include <drivers/qspi.h>
 #include <nrfx_qspi.h>
 #include <stdio.h>
@@ -15,11 +15,21 @@ LOG_MODULE_REGISTER(qspi_nrfx_qspi);
 
 #include "qspi_context.h"
 
+/* Private typedef -----------------------------------------------------------*/
+/* Private define ------------------------------------------------------------*/
+#define QSPI_STD_CMD_WRSR   0x01
+#define QSPI_STD_CMD_RSTEN  0x66
+#define QSPI_STD_CMD_RST    0x99
+
 #define WAIT_FOR_PERIPH() do { \
         while (!m_finished) {} \
         m_finished = false;    \
     } while (0)
 
+/* Private macro -------------------------------------------------------------*/
+/* Private variables ---------------------------------------------------------*/
+
+static volatile bool m_finished = false;
 
 struct qspi_nrfx_data {
 	struct qspi_context ctx;
@@ -33,9 +43,10 @@ struct qspi_nrfx_data {
 struct qspi_nrfx_config {
 	nrfx_qspi_config_t config;
 };
+/* Private function prototypes -----------------------------------------------*/
+static void transfer_next_chunk(struct device *dev);
 
-static volatile bool m_finished = false;
-
+/* Private functions ---------------------------------------------------------*/
 static inline struct qspi_nrfx_data *get_dev_data(struct device *dev)
 {
 	return dev->driver_data;
@@ -86,8 +97,6 @@ static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency)
 	}
 }
 
-
-
 static inline nrf_qspi_addrmode_t get_nrf_qspi_address_mode(u16_t operation)
 {
 	if (QSPI_ADDRESS_MODE_GET(operation) & QSPI_ADDRESS_MODE_24BIT) {
@@ -102,20 +111,54 @@ static inline nrf_qspi_addrmode_t get_nrf_qspi_address_mode(u16_t operation)
 	}
 }
 
-//static inline nrf_qspi_bit_order_t get_nrf_qspi_bit_order(u16_t operation)
-//{
-////	if (operation & QSPI_TRANSFER_LSB) {
-////		return NRF_QSPI_BIT_ORDER_LSB_FIRST;
-////	} else {
-////		return NRF_QSPI_BIT_ORDER_MSB_FIRST;
-////	}
-//}
+static nrf_qspi_readoc_t get_nrf_qspi_readoc(u16_t operation)
+{
+	if (QSPI_DATA_LINES_GET(operation) == QSPI_DATA_LINES_SINGLE) {
+		return NRF_QSPI_READOC_FASTREAD;
+	}
+	else if (QSPI_DATA_LINES_GET(operation) == QSPI_DATA_LINES_DOUBLE){
+		return NRF_QSPI_READOC_READ2IO;
+	}
+	else if (QSPI_DATA_LINES_GET(operation) == QSPI_DATA_LINES_QUAD){
+		return NRF_QSPI_READOC_READ4IO;
+	}
+	else{
+		LOG_ERR("Not supported line type");
+		return -EINVAL;
+	}
+}
+
+static nrf_qspi_writeoc_t get_nrf_qspi_wrieoc(u16_t operation)
+{
+	if (QSPI_DATA_LINES_GET(operation) == QSPI_DATA_LINES_SINGLE) {
+		return NRF_QSPI_WRITEOC_PP;
+	}
+	else if (QSPI_DATA_LINES_GET(operation) == QSPI_DATA_LINES_DOUBLE){
+		return NRF_QSPI_WRITEOC_PP2O;
+	}
+	else if (QSPI_DATA_LINES_GET(operation) == QSPI_DATA_LINES_QUAD){
+		return NRF_QSPI_WRITEOC_PP4IO;
+	}
+	else{
+		LOG_ERR("Not supported line type");
+		return -EINVAL;
+	}
+}
+
 
 static void qspi_handler(nrfx_qspi_evt_t event, void * p_context)
 {
-    UNUSED_PARAMETER(event);
-    UNUSED_PARAMETER(p_context);
-    m_finished = true;
+//    m_finished = true;
+	struct device *dev = p_context;
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+
+	if (event == NRFX_QSPI_EVENT_DONE) {
+		qspi_context_update_tx(&dev_data->ctx, 1, dev_data->chunk_len);
+		qspi_context_update_rx(&dev_data->ctx, 1, dev_data->chunk_len);
+
+		transfer_next_chunk(dev);
+	}
+
 }
 
 static int configure(struct device *dev,
@@ -123,10 +166,8 @@ static int configure(struct device *dev,
 {
 	printf("\n--> configure");
 	struct qspi_context *ctx = &get_dev_data(dev)->ctx;
-	nrfx_qspi_config_t * p_config = &get_dev_config(dev)->config;
+	const nrfx_qspi_config_t * p_config = &get_dev_config(dev)->config;
 
-//	const nrfx_qspi_t *qspi = &get_dev_config(dev)->qspi;
-//
 	if (qspi_context_configured(ctx, qspi_cfg)) {
 		/* Already configured. No need to do it again. */
 		return 0;
@@ -138,108 +179,148 @@ static int configure(struct device *dev,
 		return -EINVAL;
 	}
 
-//	if (QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) != (QSPI_ADDRESS_MODE_24BIT )
-//			|| QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) != (QSPI_ADDRESS_MODE_32BIT)) {
-//			LOG_ERR("Address mode not supported.");
-//			printf("\n<-- configure : ADDRESS");
-//			return -EINVAL;
-//	}
+	/* Check address mode */
+	if (QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) == QSPI_ADDRESS_MODE_24BIT) {
+		printf("\n24 BIT ADDR");
 
+	}
+	else if (QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) == QSPI_ADDRESS_MODE_32BIT){
+		printf("\n32 BIT ADDR");
+	}
+	else{
+		LOG_ERR("Address modes other than 24 or 32 bits are not supported");
+		printf("\nNONE ADDRESS");
+		return -EINVAL;
+	}
 
-		if (QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) == QSPI_ADDRESS_MODE_24BIT) {
-				printf("\n24 BIT ADDR");
-
+	/* Check data line mode */
+		if (QSPI_DATA_LINES_GET(qspi_cfg->operation) == QSPI_DATA_LINES_SINGLE) {
+			printf("\nSingle line read");
 		}
-		else if (QSPI_ADDRESS_MODE_GET(qspi_cfg->operation) == QSPI_ADDRESS_MODE_32BIT){
-			printf("\n32 BIT ADDR");
+		else if (QSPI_DATA_LINES_GET(qspi_cfg->operation) == QSPI_DATA_LINES_DOUBLE){
+			printf("\nDouble line read");
+		}
+		else if (QSPI_DATA_LINES_GET(qspi_cfg->operation) == QSPI_DATA_LINES_QUAD){
+			printf("\nQuad line read");
 		}
 		else{
-			LOG_ERR("Address modes other than 24 or 32 bits are not supported");
-			printf("\nNONE ADDRESS");
+			LOG_ERR("Other data line mode not supported");
+			printf("\nOther data line mode not supported");
 			return -EINVAL;
 		}
 //
 //	/* Input parameters OK - initialise QSPI */
-//	ctx->config = qspi_cfg;
-//	qspi_context_cs_configure(ctx);
-//
-//	nrfx_qspi_config_t config = NRFX_QSPI_DEFAULT_CONFIG;
-//
-//	if(nrfx_qspi_init(&config, qspi_handler, NULL ) != NRFX_SUCCESS){
-//		return 1;
-//	}
-// err_code = nrf_drv_qspi_init(&config, qspi_handler, NULL);
+	nrfx_qspi_uninit();
 
-	/* Sets address value */
-//	nrf_qspi_addrconfig_set(qspi->p_reg,
-//			get_nrf_qspi_address_mode(qspi_cfg->operation));
-//
-//	if (qspi_cfg->operation & QSPI_MODE_LOOP) {
-//		LOG_ERR("Loopback mode is not supported");
-//		return -EINVAL;
-//	}
-//
-//	if ((qspi_cfg->operation & QSPI_LINES_MASK) != QSPI_LINES_SINGLE) {
-//		LOG_ERR("Only single line mode is supported");
-//		return -EINVAL;
-//	}
-//
-//	if (QSPI_WORD_SIZE_GET(qspi_cfg->operation) != 8) {
-//		LOG_ERR("Word sizes other than 8 bits"
-//			    " are not supported");
-//		return -EINVAL;
-//	}
-//
-//	if (qspi_cfg->frequency < 125000) {
-//		LOG_ERR("Frequencies lower than 125 kHz are not supported");
-//		return -EINVAL;
-//	}
-//
-//	ctx->config = qspi_cfg;
-//	qspi_context_cs_configure(ctx);
-//
-//	nrf_qspi_configure(qspi->p_reg,
-//			  get_nrf_qspi_mode(qspi_cfg->operation),
-//			  get_nrf_qspi_bit_order(qspi_cfg->operation));
-//	nrf_qspi_frequency_set(qspi->p_reg,
-//			      get_nrf_qspi_frequency(qspi_cfg->frequency));
-//
+/* To trzeba kiedys zastapic */
+	nrfx_qspi_config_t config = {
+			.xip_offset  = NRFX_QSPI_CONFIG_XIP_OFFSET,
+			.pins = {
+			   .sck_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_SCK_PIN,
+			   .csn_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_CSN_PIN,
+			   .io0_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO00_PIN,
+			   .io1_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO01_PIN,
+			   .io2_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO02_PIN,
+			   .io3_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO03_PIN,
+			},
+			.irq_priority   = (uint8_t)NRFX_QSPI_CONFIG_IRQ_PRIORITY,
+			.prot_if = {
+				.readoc     = (nrf_qspi_readoc_t)get_nrf_qspi_readoc(qspi_cfg->operation),
+				.writeoc    = (nrf_qspi_writeoc_t)get_nrf_qspi_wrieoc(qspi_cfg->operation),
+				.addrmode   = (nrf_qspi_addrmode_t)get_nrf_qspi_address_mode(qspi_cfg->operation),
+				.dpmconfig  = false,
+			},
+			.phy_if = {
+				.sck_freq   = (nrf_qspi_frequency_t)get_nrf_qspi_prescaler(qspi_cfg->operation),
+				.sck_delay  = (uint8_t)QSPI_CS_DELAY_GET(qspi_cfg->operation),
+				.spi_mode   = (nrf_qspi_spi_mode_t)0,
+				.dpmen      = false
+			},
+		};
+
+	if(nrfx_qspi_init(&config, qspi_handler, dev ) != NRFX_SUCCESS){
+		return 1;
+	}
+
+	/* Config finished. Check if QUAD mode is chosen - if so, we have to send QE command to the  */
+	if(config.prot_if.readoc == NRF_QSPI_READOC_READ4IO){
+		 uint8_t temporary = 0x40;
+		    uint32_t err_code;
+		    nrf_qspi_cinstr_conf_t cinstr_cfg = {
+		        .opcode    = QSPI_STD_CMD_RSTEN,
+		        .length    = NRF_QSPI_CINSTR_LEN_1B,
+		        .io2_level = true,
+		        .io3_level = true,
+		        .wipwait   = true,
+		        .wren      = true
+		    };
+		    // Switch to qspi mode
+		    cinstr_cfg.opcode = QSPI_STD_CMD_WRSR;
+		    cinstr_cfg.length = NRF_QSPI_CINSTR_LEN_2B;
+		    err_code = nrfx_qspi_cinstr_xfer(&cinstr_cfg, &temporary, NULL);
+	}
 	printf("\n<-- configure : OK");
 	return 0;
 }
 
 static void transfer_next_chunk(struct device *dev)
 {
-//	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
-//	struct qspi_context *ctx = &dev_data->ctx;
-//	int error = 0;
-//
-//	size_t chunk_len = qspi_context_longest_current_buf(ctx);
-//
-//	if (chunk_len > 0) {
-//		nrfx_qspi_xfer_desc_t xfer;
-//		nrfx_err_t result;
-//
-//		dev_data->chunk_len = chunk_len;
-//
-//		xfer.p_tx_buffer = ctx->tx_buf;
-//		xfer.tx_length   = qspi_context_tx_buf_on(ctx) ? chunk_len : 0;
-//		xfer.p_rx_buffer = ctx->rx_buf;
-//		xfer.rx_length   = qspi_context_rx_buf_on(ctx) ? chunk_len : 0;
-//		result = nrfx_qspi_xfer(&get_dev_config(dev)->qspi, &xfer, 0);
-//		if (result == NRFX_SUCCESS) {
-//			return;
-//		}
-//
-//		error = -EIO;
-//	}
-//
-//	qspi_context_cs_control(ctx, false);
-//
-//	LOG_DBG("Transaction finished with status %d", error);
-//
-//	qspi_context_complete(ctx, error);
-//	dev_data->busy = false;
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+	struct qspi_context *ctx = &dev_data->ctx;
+	int error = 0;
+
+	size_t chunk_len = qspi_context_longest_current_buf(ctx);
+
+	if (chunk_len > 0) {
+		nrfx_err_t result;
+
+		dev_data->chunk_len = chunk_len;
+
+		result = nrfx_qspi_write(ctx->tx_buf, chunk_len, ctx->address);
+
+		if (result == NRFX_SUCCESS) {
+			return;
+		}
+
+		error = -EIO;
+	}
+
+	qspi_context_cs_control(ctx, false);
+
+	LOG_DBG("Transaction finished with status %d", error);
+
+	qspi_context_complete(ctx, error);
+	dev_data->busy = false;
+}
+
+static void receive_next_chunk(struct device *dev)
+{
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+	struct qspi_context *ctx = &dev_data->ctx;
+	int error = 0;
+
+	size_t chunk_len = qspi_context_longest_current_buf(ctx);
+
+	if (chunk_len > 0) {
+		nrfx_err_t result;
+
+		dev_data->chunk_len = chunk_len;
+
+		result = nrfx_qspi_read(ctx->rx_buf, chunk_len, ctx->address);
+
+		if (result == NRFX_SUCCESS) {
+			return;
+		}
+
+		error = -EIO;
+	}
+
+	qspi_context_cs_control(ctx, false);
+
+	LOG_DBG("Transaction finished with status %d", error);
+
+	qspi_context_complete(ctx, error);
+	dev_data->busy = false;
 }
 
 static int transceive(struct device *dev,
@@ -252,19 +333,22 @@ static int transceive(struct device *dev,
 	int error;
 
 	error = configure(dev, qspi_cfg);
+	printf("\n<-- exit:configure : %d", error);
 	if (error == 0) {
 		dev_data->busy = true;
 
-		qspi_context_buffers_setup(&dev_data->ctx, tx_bufs, rx_bufs, 1);
+//		qspi_context_buffers_setup(&dev_data->ctx, tx_bufs, rx_bufs, 1);
+		printf("\n--- Buffers setup OK");
 		qspi_context_cs_control(&dev_data->ctx, true);
-
+		printf("\n--- CS control OK");
 		transfer_next_chunk(dev);
-
+		printf("\n--- Transfer OK");
 		error = qspi_context_wait_for_completion(&dev_data->ctx);
+		printf("\n--- Wait for context OK");
 	}
 
 	qspi_context_release(&dev_data->ctx, error);
-	printf("\n--> transceive : %d", error);
+	printf("\n<-- transceive : %d", error);
 	return error;
 }
 
@@ -276,6 +360,71 @@ static int qspi_nrfx_transceive(struct device *dev,
 	printf("CHlosta");
 	qspi_context_lock(&get_dev_data(dev)->ctx, false, NULL);
 	return transceive(dev, qspi_cfg, tx_bufs, rx_bufs);
+	return 0;
+}
+
+static int qspi_nrfx_write(struct device *dev,
+			       const struct qspi_config *qspi_cfg,
+			       const struct qspi_buf_set *tx_bufs,
+			       uint32_t address)
+{
+	printf("\nNRFX_WRITE");
+	qspi_context_lock(&get_dev_data(dev)->ctx, false, NULL);
+
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+	int error;
+
+	error = configure(dev, qspi_cfg);
+	printf("\n<-- exit:configure : %d", error);
+	if (error == 0) {
+		dev_data->busy = true;
+
+		qspi_context_buffers_setup(&dev_data->ctx, tx_bufs, NULL, address, 1);
+		printf("\n--- Buffers setup OK");
+		qspi_context_cs_control(&dev_data->ctx, true);
+		printf("\n--- CS control OK");
+		transfer_next_chunk(dev);
+		printf("\n--- Transfer OK");
+		error = qspi_context_wait_for_completion(&dev_data->ctx);
+		printf("\n--- Wait for context OK");
+	}
+
+	qspi_context_release(&dev_data->ctx, error);
+	printf("\n<-- transceive : %d", error);
+
+	return 0;
+}
+
+static int qspi_nrfx_read(struct device *dev,
+			       const struct qspi_config *qspi_cfg,
+			       const struct qspi_buf_set *rx_bufs,
+				   uint32_t address)
+{
+	printf("\nNRFX_READ");
+
+	qspi_context_lock(&get_dev_data(dev)->ctx, false, NULL);
+
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+	int error;
+
+	error = configure(dev, qspi_cfg);
+	printf("\n<-- exit:configure : %d", error);
+	if (error == 0) {
+		dev_data->busy = true;
+
+		qspi_context_buffers_setup(&dev_data->ctx, NULL, rx_bufs, address, 1);
+		printf("\n--- Buffers setup OK");
+		qspi_context_cs_control(&dev_data->ctx, true);
+		printf("\n--- CS control OK");
+		receive_next_chunk(dev);
+		printf("\n--- Transfer OK");
+		error = qspi_context_wait_for_completion(&dev_data->ctx);
+		printf("\n--- Wait for context OK");
+	}
+
+	qspi_context_release(&dev_data->ctx, error);
+	printf("\n<-- transceive : %d", error);
+
 	return 0;
 }
 
@@ -297,23 +446,25 @@ static int qspi_nrfx_release(struct device *dev,
 			    const struct qspi_config *qspi_cfg)
 {
 	printf("Release");
-//	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
-//
-//	if (!qspi_context_configured(&dev_data->ctx, qspi_cfg)) {
-//		return -EINVAL;
-//	}
-//
-//	if (dev_data->busy) {
-//		return -EBUSY;
-//	}
-//
-//	qspi_context_unlock_unconditionally(&dev_data->ctx);
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+
+	if (!qspi_context_configured(&dev_data->ctx, qspi_cfg)) {
+		return -EINVAL;
+	}
+
+	if (dev_data->busy) {
+		return -EBUSY;
+	}
+
+	qspi_context_unlock_unconditionally(&dev_data->ctx);
 
 	return 0;
 }
 
 static const struct qspi_driver_api qspi_nrfx_driver_api = {
 	.transceive = qspi_nrfx_transceive,
+	.write = qspi_nrfx_write,
+	.read = qspi_nrfx_read,
 #ifdef CONFIG_QSPI_ASYNC
 	.transceive_async = qspi_nrfx_transceive_async,
 #endif
@@ -323,15 +474,15 @@ static const struct qspi_driver_api qspi_nrfx_driver_api = {
 
 static void event_handler(const nrfx_qspi_evt_t *p_event, void *p_context)
 {
-	struct device *dev = p_context;
-	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
-
-	if (*p_event == NRFX_QSPI_EVENT_DONE) {
-		qspi_context_update_tx(&dev_data->ctx, 1, dev_data->chunk_len);
-		qspi_context_update_rx(&dev_data->ctx, 1, dev_data->chunk_len);
-
-		transfer_next_chunk(dev);
-	}
+//	struct device *dev = p_context;
+//	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+//
+//	if (*p_event == NRFX_QSPI_EVENT_DONE) {
+//		qspi_context_update_tx(&dev_data->ctx, 1, dev_data->chunk_len);
+//		qspi_context_update_rx(&dev_data->ctx, 1, dev_data->chunk_len);
+//
+//		transfer_next_chunk(dev);
+//	}
 }
 
 static int init_qspi(struct device *dev)
@@ -398,9 +549,6 @@ static int qspi_nrfx_pm_control(struct device *dev, u32_t ctrl_command,
 }
 #endif /* CONFIG_DEVICE_POWER_MANAGEMENT */
 
-//		.qspi = NRFX_QSPI_INSTANCE(0),
-//nrfx_qspi_irq_handler
-//NRFX_QSPI_CONFIG_ADDRMODE
 #define QSPI_NRFX_QSPI_DEVICE(void)					       \
 	static int qspi_init(struct device *dev)			       \
 	{								       \
@@ -429,7 +577,7 @@ static int qspi_nrfx_pm_control(struct device *dev, u32_t ctrl_command,
 			.prot_if = {                                                        \
 				.readoc     = (nrf_qspi_readoc_t)NRFX_QSPI_CONFIG_READOC,       \
 				.writeoc    = (nrf_qspi_writeoc_t)NRFX_QSPI_CONFIG_WRITEOC,     \
-				.addrmode   = (nrf_qspi_addrmode_t)QSPI_ADDRESS_MODE_24BIT,   \
+				.addrmode   = (nrf_qspi_addrmode_t)NRF_QSPI_ADDRMODE_24BIT,   \
 				.dpmconfig  = false,                                            \
 			},                                                                  \
 			.phy_if = {                                                         \
