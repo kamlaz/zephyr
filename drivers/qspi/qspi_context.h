@@ -36,9 +36,7 @@ struct qspi_context {
 	bool asynchronous;
 #endif /* CONFIG_QSPI_ASYNC */
 	const struct qspi_buf *current_tx;
-	size_t tx_count;
 	const struct qspi_buf *current_rx;
-	size_t rx_count;
 
 	const u8_t *tx_buf;
 	size_t tx_len;
@@ -46,6 +44,7 @@ struct qspi_context {
 	size_t rx_len;
 
 	u32_t address;
+	u32_t op_code;
 //#ifdef CONFIG_QSPI_SLAVE
 //	int recv_frames;
 //#endif /* CONFIG_QSPI_SLAVE */
@@ -219,38 +218,39 @@ static inline void qspi_context_unlock_unconditionally(struct qspi_context *ctx)
 
 static inline
 void qspi_context_buffers_setup(struct qspi_context *ctx,
-			       const struct qspi_buf_set *tx_bufs,
-			       const struct qspi_buf_set *rx_bufs,
+			       const void *tx_buf,
+				   uint32_t tx_len,
+			       const void *rx_buf,
+				   uint32_t rx_len,
 				   const u32_t address,
-			       u8_t dfs)
+				   const u32_t op_code,
+				   u8_t dfs)
 {
-	LOG_DBG("tx_bufs %p - rx_bufs %p - %u", tx_bufs, rx_bufs, dfs);
+	LOG_DBG("tx_bufs %p - rx_bufs %p - %u", tx_buf, rx_buf, dfs);
 
-	if (tx_bufs) {
-		ctx->current_tx = tx_bufs->buffers;
-		ctx->tx_count = tx_bufs->count;
-		ctx->tx_buf = (const u8_t *)ctx->current_tx->buf;
-		ctx->tx_len = ctx->current_tx->len / dfs;
+	if (tx_buf) {
+		ctx->current_tx = tx_buf;
+		ctx->tx_buf = (const u8_t *)ctx->current_tx;
+		ctx->tx_len = tx_len / dfs;
 	} else {
 		ctx->current_tx = NULL;
-		ctx->tx_count = 0;
 		ctx->tx_buf = NULL;
 		ctx->tx_len = 0;
 	}
 
-	if (rx_bufs) {
-		ctx->current_rx = rx_bufs->buffers;
-		ctx->rx_count = rx_bufs->count;
-		ctx->rx_buf = (u8_t *)ctx->current_rx->buf;
-		ctx->rx_len = ctx->current_rx->len / dfs;
+	if (rx_buf) {
+		ctx->current_rx = rx_buf;
+		ctx->rx_buf = (u8_t *)ctx->current_rx;
+		ctx->rx_len = rx_len / dfs;
 	} else {
 		ctx->current_rx = NULL;
-		ctx->rx_count = 0;
 		ctx->rx_buf = NULL;
 		ctx->rx_len = 0;
 	}
 
 	ctx->address = address;
+
+	ctx->op_code = op_code;
 
 	ctx->sync_status = 0;
 
@@ -258,11 +258,11 @@ void qspi_context_buffers_setup(struct qspi_context *ctx,
 //	ctx->recv_frames = 0;
 //#endif /* CONFIG_QSPI_SLAVE */
 
-	LOG_DBG("current_tx %p (%zu), current_rx %p (%zu),"
-		    " tx buf/len %p/%zu, rx buf/len %p/%zu",
-		    ctx->current_tx, ctx->tx_count,
-		    ctx->current_rx, ctx->rx_count,
-		    ctx->tx_buf, ctx->tx_len, ctx->rx_buf, ctx->rx_len);
+//	LOG_DBG("current_tx %p (%zu), current_rx %p (%zu),"
+//		    " tx buf/len %p/%zu, rx buf/len %p/%zu",
+//		    ctx->current_tx, ctx->tx_count,
+//		    ctx->current_rx, ctx->rx_count,
+//		    ctx->tx_buf, ctx->tx_len, ctx->rx_buf, ctx->rx_len);
 }
 
 static ALWAYS_INLINE
@@ -278,18 +278,18 @@ void qspi_context_update_tx(struct qspi_context *ctx, u8_t dfs, u32_t len)
 	}
 
 	ctx->tx_len -= len;
-	if (!ctx->tx_len) {
-		ctx->tx_count--;
-		if (ctx->tx_count) {
-			ctx->current_tx++;
-			ctx->tx_buf = (const u8_t *)ctx->current_tx->buf;
-			ctx->tx_len = ctx->current_tx->len / dfs;
-		} else {
-			ctx->tx_buf = NULL;
-		}
-	} else if (ctx->tx_buf) {
+//	if (!ctx->tx_len) {
+//		ctx->tx_count--;
+//		if (ctx->tx_count) {
+//			ctx->current_tx++;
+//			ctx->tx_buf = (const u8_t *)ctx->current_tx->buf;
+//			ctx->tx_len = ctx->current_tx->len / dfs;
+//		} else {
+//			ctx->tx_buf = NULL;
+//		}
+//	} else if (ctx->tx_buf) {
 		ctx->tx_buf += dfs * len;
-	}
+//	}
 
 	LOG_DBG("tx buf/len %p/%zu", ctx->tx_buf, ctx->tx_len);
 }
@@ -326,18 +326,18 @@ void qspi_context_update_rx(struct qspi_context *ctx, u8_t dfs, u32_t len)
 	}
 
 	ctx->rx_len -= len;
-	if (!ctx->rx_len) {
-		ctx->rx_count--;
-		if (ctx->rx_count) {
-			ctx->current_rx++;
-			ctx->rx_buf = (u8_t *)ctx->current_rx->buf;
-			ctx->rx_len = ctx->current_rx->len / dfs;
-		} else {
-			ctx->rx_buf = NULL;
-		}
-	} else if (ctx->rx_buf) {
+//	if (!ctx->rx_len) {
+//		ctx->rx_count--;
+//		if (ctx->rx_count) {
+//			ctx->current_rx++;
+//			ctx->rx_buf = (u8_t *)ctx->current_rx->buf;
+//			ctx->rx_len = ctx->current_rx->len / dfs;
+//		} else {
+//			ctx->rx_buf = NULL;
+//		}
+//	} else if (ctx->rx_buf) {
 		ctx->rx_buf += dfs * len;
-	}
+//	}
 
 	LOG_DBG("rx buf/len %p/%zu", ctx->rx_buf, ctx->rx_len);
 }

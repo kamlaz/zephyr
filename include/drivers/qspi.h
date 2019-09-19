@@ -202,8 +202,12 @@ struct qspi_buf_set {
  */
 typedef int (*qspi_api_io)(struct device *dev,
 			  const struct qspi_config *config,
-			  const struct qspi_buf_set *tx_bufs,
-			  const struct qspi_buf_set *rx_bufs);
+			  const void *tx_buf,
+			  size_t tx_len,
+			  const void *rx_buf,
+			  size_t rx_len,
+			  u32_t op_code,
+			  u32_t address);
 
 /**
  * @typedef qspi_api_write
@@ -212,8 +216,10 @@ typedef int (*qspi_api_io)(struct device *dev,
  */
 typedef int (*qspi_api_write)(struct device *dev,
 			  const struct qspi_config *config,
-			  const struct qspi_buf_set *tx_bufs,
+			  const void * tx_buf,
+			  size_t len,
 			  uint32_t address);
+
 
 /**
  * @typedef qspi_api_read
@@ -222,19 +228,10 @@ typedef int (*qspi_api_write)(struct device *dev,
  */
 typedef int (*qspi_api_read)(struct device *dev,
 			  const struct qspi_config *config,
-			  const struct qspi_buf_set *rx_bufs,
+			  const void * rx_buf,
+			  size_t len,
 			  uint32_t address);
 
-/**
- * @typedef qspi_api_io
- * @brief Callback API for asynchronous I/O
- * See qspi_transceive_async() for argument descriptions
- */
-typedef int (*qspi_api_io_async)(struct device *dev,
-				const struct qspi_config *config,
-				const struct qspi_buf_set *tx_bufs,
-				const struct qspi_buf_set *rx_bufs,
-				struct k_poll_signal *async);
 
 /**
  * @typedef qspi_api_release
@@ -248,11 +245,13 @@ typedef int (*qspi_api_release)(struct device *dev,
 /**
  * @brief QSPI driver API
  * This is the mandatory API any QSPI driver needs to expose.
+ *
+ * @param transceive - us
  */
 struct qspi_driver_api {
-	qspi_api_io transceive;
-	qspi_api_write write;
-	qspi_api_read read;
+	qspi_api_io 	cmd_xfer;
+	qspi_api_write 	write;
+	qspi_api_read 	read;
 #ifdef CONFIG_QSPI_ASYNC
 	qspi_api_io_async transceive_async;
 #endif /* CONFIG_QSPI_ASYNC */
@@ -275,20 +274,28 @@ struct qspi_driver_api {
  *         transaction: if successful it will return the amount of frames
  *         received, negative errno code otherwise.
  */
-__syscall int qspi_transceive(struct device *dev,
-			     const struct qspi_config *config,
-			     const struct qspi_buf_set *tx_bufs,
-			     const struct qspi_buf_set *rx_bufs);
+__syscall int qspi_cmd_xfer(struct device *dev,
+					const struct qspi_config *config,
+					const void *tx_buf,
+					size_t tx_len,
+					const void *rx_buf,
+					size_t rx_len,
+					u32_t op_code,
+					u32_t address);
 
-static inline int z_impl_qspi_transceive(struct device *dev,
-				       const struct qspi_config *config,
-				       const struct qspi_buf_set *tx_bufs,
-				       const struct qspi_buf_set *rx_bufs)
+static inline int z_impl_qspi_cmd_xfer(struct device *dev,
+					const struct qspi_config *config,
+					const void *tx_buf,
+					size_t tx_len,
+					const void *rx_buf,
+					size_t rx_len,
+					u32_t op_code,
+					u32_t address)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->transceive(dev, config, tx_bufs, rx_bufs);
+	return api->cmd_xfer(dev, config, tx_buf, tx_len, rx_buf, rx_len, op_code, address);
 }
 
 /**
@@ -307,18 +314,20 @@ static inline int z_impl_qspi_transceive(struct device *dev,
  */
 __syscall int qspi_read(struct device *dev,
 				const struct qspi_config *config,
-				const struct qspi_buf_set *rx_bufs,
-				u32_t address);
+				const void * rx_buf,
+				size_t len,
+				uint32_t address);
 
 static inline int z_impl_qspi_read(struct device *dev,
-				       const struct qspi_config *config,
-				       const struct qspi_buf_set *rx_bufs,
-					   u32_t address)
+				const struct qspi_config *config,
+				const void * rx_buf,
+				size_t len,
+				uint32_t address)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->read(dev, config, rx_bufs, address);
+	return api->read(dev, config, rx_buf, len, address);
 }
 
 
@@ -338,18 +347,20 @@ static inline int z_impl_qspi_read(struct device *dev,
  */
 __syscall int qspi_write(struct device *dev,
 				const struct qspi_config *config,
-				const struct qspi_buf_set *tx_bufs,
-				u32_t address);
+				const void * tx_buf,
+				size_t len,
+				uint32_t address);
 
 static inline int z_impl_qspi_write(struct device *dev,
-				       const struct qspi_config *config,
-				       const struct qspi_buf_set *tx_bufs,
-					   u32_t address)
+				const struct qspi_config *config,
+				const void * tx_buf,
+				size_t len,
+				uint32_t address)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->write(dev, config, tx_bufs, address);
+	return api->write(dev, config, tx_buf, len, address);
 }
 
 
