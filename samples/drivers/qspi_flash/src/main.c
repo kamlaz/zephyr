@@ -32,7 +32,25 @@
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 
-#define FLASH_DEVICE CONFIG_QSPI
+//#define FLASH_DEVICE CONFIG_QSPI
+#define NO_ADDRESS			(-1)
+
+#define QSPI_STD_CMD_WRSR	0x01
+#define QSPI_STD_CMD_RSTEN  0x66
+#define QSPI_STD_CMD_RST    0x99
+#define QSPI_STD_CMD_QE		0x40
+
+//------------
+#define QSPI_STD_CMD_CE			0x60	//Chip erase
+#define QSPI_STD_CMD_JEDEC_ID	0x9F	//Jedec ID
+#define QSPI_STD_CMD_WREN		0x06	// Write enable
+#define QSPI_STD_CMD_SE			0x20	// Write enable
+
+
+#define JEDEC_ID_SIZE			3
+#define CHIP_ERASE_SIZE			1
+#define SECTOR_ERASE_SIZE		1	1
+
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
@@ -43,6 +61,7 @@ void print_buffer(struct qspi_buf * buffer, uint8_t * txbuff);
 void main(void)
 {
 	printf("\nTest 1: Flash erase\n");
+	uint8_t cmd[1] = {QSPI_STD_CMD_QE};
 	uint8_t tx[16]={1,2,3,4,5,6,7,8,1,2,3,4,5,6,7,8};
 	uint8_t rx[16]={0};
 	uint32_t address = 0x0A;
@@ -59,13 +78,12 @@ void main(void)
 	/* RX BUFFER */
 	struct qspi_buf RX={
 			.buf = &rx,
-			.len = 16
+			.len = sizeof(tx)
 	};
 	struct qspi_buf_set RXbuffer={
 			.buffers = &RX,
 			.count = 1,
 	};
-
 
 	struct device *qspi;				// Defines pointer to qspi device
 	struct qspi_config qspi_cfg;		// Config for qspi device
@@ -84,12 +102,22 @@ void main(void)
 	/* Assign config */
 	qspi_configure(&qspi_cfg);
 
+	qspi_cmd_xfer(qspi, &qspi_cfg, cmd, 3, rx ,0 , QSPI_STD_CMD_JEDEC_ID, NO_ADDRESS);
+
+	qspi_cmd_xfer(qspi, &qspi_cfg, cmd, 0, rx ,0 , QSPI_STD_CMD_SE, 0);
+
+//	qspi_cmd_xfer(qspi, &qspi_cfg, NULL, 0, NULL ,0 , QSPI_STD_CMD_WREN, 0);
+
+	/* Erases whole chip */
+//	qspi_cmd_xfer(qspi, &qspi_cfg, NULL, 0, NULL ,0 , QSPI_STD_CMD_CE, 0);
+
+//	qspi_read(qspi, &qspi_cfg, &rx,sizeof(tx), address);
+
 	/* Write data to the external flash */
-	qspi_write(qspi, &qspi_cfg, &TXbuffer, address);
+//	qspi_write(qspi, &qspi_cfg, &tx, sizeof(tx), address);
 
 	/* wait for the next sample */
-//	k_sleep(K_SECONDS(1));
-	qspi_read(qspi, &qspi_cfg, &RXbuffer, address);
+	qspi_read(qspi, &qspi_cfg, &rx,sizeof(tx), address);
 
 	printk("\n I'm Alive!");
 //	qspi_write(qspi, &qspi_cfg, &TXbuffer, address);
@@ -100,7 +128,7 @@ void main(void)
 static void qspi_configure(struct qspi_config * pCfg){
 	pCfg->prescaler = NRF_QSPI_FREQ_32MDIV16;
 	pCfg->operation = (QSPI_CS_DELAY_SET(8) 							|
-					   QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)		|
+					   QSPI_DATA_LINES_SET(QSPI_DATA_LINES_SINGLE)		|
 					   QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
 }
 
