@@ -12,24 +12,6 @@
 #include <stdio.h>
 #include <string.h>
 
-//#if (CONFIG_SPI_FLASH_W25QXXDV - 0)
-/* NB: W25Q16DV is a JEDEC spi-nor device, but has a separate driver. */
-/*
-#define FLASH_DEVICE CONFIG_SPI_FLASH_W25QXXDV_DRV_NAME
-#define FLASH_NAME "W25QXXDV"
-#elif (CONFIG_SPI_NOR - 0) || defined(DT_INST_0_JEDEC_SPI_NOR_LABEL)
-#define FLASH_DEVICE DT_INST_0_JEDEC_SPI_NOR_LABEL
-#define FLASH_NAME "JEDEC SPI-NOR"
-#else
-#error Unsupported flash driver
-#endif
-
-#define FLASH_TEST_REGION_OFFSET 0xff000
-#define FLASH_SECTOR_SIZE        4096
-#define TEST_DATA_BYTE_0         0x55
-#define TEST_DATA_BYTE_1         0xaa
-#define TEST_DATA_LEN            2
-*/
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 
@@ -74,12 +56,8 @@ void print_buff(uint8_t * pBuff, uint32_t size);
 void main(void)
 {
 	printf("\nTest 1: Flash erase\n");
-	uint8_t cmd[1] = {QSPI_STD_CMD_QE};
-//	uint8_t tx[BUFF_SIZE]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-	uint8_t tx[BUFF_SIZE]={0};
-	uint8_t rx[BUFF_SIZE]={0};
-	uint32_t address = 0x0A;
-
+	static uint8_t tx[BUFF_SIZE]={0};
+	static uint8_t rx[BUFF_SIZE]={0};
 
 	struct device *qspi;				// Defines pointer to qspi device
 	struct qspi_config qspi_cfg;		// Config for qspi device
@@ -94,31 +72,24 @@ void main(void)
 		printk("Could not find SPI driver\n");
 		return;
 	}
-	fill_buff(tx,sizeof(tx),sizeof(tx));
-	fill_buff(rx,sizeof(rx),sizeof(rx));
-	print_buff(tx,sizeof(tx));
-	print_buff(rx,sizeof(rx));
-//	/* Assign config */
-//	qspi_configure(&qspi_cfg);
-//
-//	if(test_loop(qspi,&qspi_cfg,tx,rx,BUFF_SIZE,BUFF_SIZE) != HAL_OK){
-//		printf("\nTEST: FAILED");
-//	}
-//	else{
-//		printf("\nTEST: PASSED");
-//	}
 
-	printk("\n I'm Alive!");
+	/* Assign config */
+	qspi_configure(&qspi_cfg);
 
-
+	if(test_loop(qspi,&qspi_cfg,tx,rx,BUFF_SIZE,BUFF_SIZE) != HAL_OK){
+		printf("\nTEST: FAILED");
+	}
+	else{
+		printf("\nTEST: PASSED");
+	}
 }
 
 
 static void qspi_configure(struct qspi_config * pCfg){
-	pCfg->prescaler = NRF_QSPI_FREQ_32MDIV16;
-	pCfg->operation = (QSPI_CS_DELAY_SET(8) 							|
-					   QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)		|
-					   QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
+	pCfg->frequency = 8000000;
+	pCfg->operation = (	QSPI_CS_DELAY_SET(8) 							|
+						QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)		|
+						QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
 }
 
 /* Loop for testing */
@@ -198,7 +169,7 @@ int fill_buff(uint8_t *buff, uint32_t buff_size, uint32_t size_to_fill) {
 	if (buff) {
 		if (buff_size >= (size_to_fill)) {
 			for (uint32_t i = 0; i < size_to_fill; i++) {
-				*buff++ = i;
+				*buff++ = (uint8_t)i;
 			}
 			printf("OK");
 			retval = HAL_OK;
@@ -214,8 +185,8 @@ int fill_buff(uint8_t *buff, uint32_t buff_size, uint32_t size_to_fill) {
 }
 
 void print_buff(uint8_t * pBuff, uint32_t size){
-	printf("\nBuff: ");
-	for(uint8_t i=0; i< size; i++){
-		printf("0x%02X," ,*pBuff++);
+	printk("\nBuff: ");
+	for(uint32_t i=0; i< size; i++){
+		printk("0x%02X," ,*pBuff++);
 	}
 }

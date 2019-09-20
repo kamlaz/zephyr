@@ -19,10 +19,8 @@
 extern "C" {
 #endif
 
-enum qspi_ctx_runtime_op_mode {
-	QSPI_CTX_RUNTIME_OP_MODE_MASTER = BIT(0),
-//	QSPI_CTX_RUNTIME_OP_MODE_SLAVE  = BIT(1),
-};
+#define CS_HIGH		1
+#define CS_LOW		0
 
 struct qspi_context {
 	const struct qspi_config *config;
@@ -45,9 +43,6 @@ struct qspi_context {
 
 	u32_t address;
 	u32_t op_code;
-//#ifdef CONFIG_QSPI_SLAVE
-//	int recv_frames;
-//#endif /* CONFIG_QSPI_SLAVE */
 };
 
 #define QSPI_CONTEXT_INIT_LOCK(_data, _ctx_name)				\
@@ -61,11 +56,6 @@ static inline bool qspi_context_configured(struct qspi_context *ctx,
 {
 	return !!(ctx->config == config);
 }
-
-//static inline bool qspi_context_is_slave(struct qspi_context *ctx)
-//{
-//	return (ctx->config->operation & QSPI_OP_MODE_SLAVE);
-//}
 
 static inline void qspi_context_lock(struct qspi_context *ctx,
 				    bool asynchronous,
@@ -81,11 +71,6 @@ static inline void qspi_context_lock(struct qspi_context *ctx,
 
 static inline void qspi_context_release(struct qspi_context *ctx, int status)
 {
-//#ifdef CONFIG_QSPI_SLAVE
-//	if (status >= 0 && (ctx->config->operation & QSPI_LOCK_ON)) {
-//		return;
-//	}
-//#endif /* CONFIG_QSPI_SLAVE */
 
 #ifdef CONFIG_QSPI_ASYNC
 	if (!ctx->asynchronous || (status < 0)) {
@@ -109,12 +94,6 @@ static inline int qspi_context_wait_for_completion(struct qspi_context *ctx)
 	status = ctx->sync_status;
 #endif /* CONFIG_QSPI_ASYNC */
 
-//#ifdef CONFIG_QSPI_SLAVE
-//	if (qspi_context_is_slave(ctx) && !status) {
-//		return ctx->recv_frames;
-//	}
-//#endif /* CONFIG_QSPI_SLAVE */
-
 	return status;
 }
 
@@ -126,14 +105,6 @@ static inline void qspi_context_complete(struct qspi_context *ctx, int status)
 		k_sem_give(&ctx->sync);
 	} else {
 		if (ctx->signal) {
-//#ifdef CONFIG_QSPI_SLAVE
-//			if (qspi_context_is_slave(ctx) && !status) {
-//				/* Let's update the status so it tells
-//				 * about number of received frames.
-//				 */
-//				status = ctx->recv_frames;
-//			}
-//#endif /* CONFIG_QSPI_SLAVE */
 			k_poll_signal_raise(ctx->signal, status);
 		}
 
@@ -145,24 +116,6 @@ static inline void qspi_context_complete(struct qspi_context *ctx, int status)
 	ctx->sync_status = status;
 	k_sem_give(&ctx->sync);
 #endif /* CONFIG_QSPI_ASYNC */
-}
-
-static inline int qspi_context_cs_active_value(struct qspi_context *ctx)
-{
-//	if (ctx->config->operation & QSPI_CS_ACTIVE_HIGH) {
-//		return 1;
-//	}
-
-	return 0;
-}
-
-static inline int qspi_context_cs_inactive_value(struct qspi_context *ctx)
-{
-//	if (ctx->config->operation & QSPI_CS_ACTIVE_HIGH) {
-//		return 0;
-//	}
-
-	return 1;
 }
 
 static inline void qspi_context_cs_configure(struct qspi_context *ctx)
@@ -185,18 +138,13 @@ static inline void _qspi_context_cs_control(struct qspi_context *ctx,
 		if (on) {
 			gpio_pin_write(ctx->config->cs->gpio_dev,
 				       ctx->config->cs->gpio_pin,
-				       qspi_context_cs_active_value(ctx));
+					   CS_HIGH);
 			k_busy_wait(ctx->config->cs->delay);
 		} else {
-//			if (!force_off &&
-//			    ctx->config->operation & QSPI_HOLD_ON_CS) {
-//				return;
-//			}
-
 			k_busy_wait(ctx->config->cs->delay);
 			gpio_pin_write(ctx->config->cs->gpio_dev,
 				       ctx->config->cs->gpio_pin,
-				       qspi_context_cs_inactive_value(ctx));
+					   CS_LOW);
 		}
 	}
 }
@@ -254,15 +202,11 @@ void qspi_context_buffers_setup(struct qspi_context *ctx,
 
 	ctx->sync_status = 0;
 
-//#ifdef CONFIG_QSPI_SLAVE
-//	ctx->recv_frames = 0;
-//#endif /* CONFIG_QSPI_SLAVE */
 
-//	LOG_DBG("current_tx %p (%zu), current_rx %p (%zu),"
-//		    " tx buf/len %p/%zu, rx buf/len %p/%zu",
-//		    ctx->current_tx, ctx->tx_count,
-//		    ctx->current_rx, ctx->rx_count,
-//		    ctx->tx_buf, ctx->tx_len, ctx->rx_buf, ctx->rx_len);
+	LOG_DBG("current_tx %p, current_rx %p,"
+		    " tx buf/len %p/%zu, rx buf/len %p/%zu",
+		    ctx->current_tx, ctx->current_rx,
+		    ctx->tx_buf, ctx->tx_len, ctx->rx_buf, ctx->rx_len);
 }
 
 static ALWAYS_INLINE
@@ -278,18 +222,7 @@ void qspi_context_update_tx(struct qspi_context *ctx, u8_t dfs, u32_t len)
 	}
 
 	ctx->tx_len -= len;
-//	if (!ctx->tx_len) {
-//		ctx->tx_count--;
-//		if (ctx->tx_count) {
-//			ctx->current_tx++;
-//			ctx->tx_buf = (const u8_t *)ctx->current_tx->buf;
-//			ctx->tx_len = ctx->current_tx->len / dfs;
-//		} else {
-//			ctx->tx_buf = NULL;
-//		}
-//	} else if (ctx->tx_buf) {
-		ctx->tx_buf += dfs * len;
-//	}
+	ctx->tx_buf += dfs * len;
 
 	LOG_DBG("tx buf/len %p/%zu", ctx->tx_buf, ctx->tx_len);
 }
@@ -309,13 +242,6 @@ bool qspi_context_tx_buf_on(struct qspi_context *ctx)
 static ALWAYS_INLINE
 void qspi_context_update_rx(struct qspi_context *ctx, u8_t dfs, u32_t len)
 {
-//#ifdef CONFIG_QSPI_SLAVE
-//	if (qspi_context_is_slave(ctx)) {
-//		ctx->recv_frames += len;
-//	}
-//
-//#endif /* CONFIG_QSPI_SLAVE */
-
 	if (!ctx->rx_len) {
 		return;
 	}
@@ -326,18 +252,7 @@ void qspi_context_update_rx(struct qspi_context *ctx, u8_t dfs, u32_t len)
 	}
 
 	ctx->rx_len -= len;
-//	if (!ctx->rx_len) {
-//		ctx->rx_count--;
-//		if (ctx->rx_count) {
-//			ctx->current_rx++;
-//			ctx->rx_buf = (u8_t *)ctx->current_rx->buf;
-//			ctx->rx_len = ctx->current_rx->len / dfs;
-//		} else {
-//			ctx->rx_buf = NULL;
-//		}
-//	} else if (ctx->rx_buf) {
-		ctx->rx_buf += dfs * len;
-//	}
+	ctx->rx_buf += dfs * len;
 
 	LOG_DBG("rx buf/len %p/%zu", ctx->rx_buf, ctx->rx_len);
 }
