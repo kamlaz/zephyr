@@ -23,11 +23,6 @@ config QSPI_ASYNC
 	help
 	  This option enables the asynchronous API calls.
 
-config QSPI_SLAVE
-	bool "Enable Slave support [EXPERIMENTAL]"
-	help
-	  Enables Driver QSPI slave operations. Slave support depends
-	  on the driver and the hardware it runs on.
 
 config QSPI_INIT_PRIORITY
 	int "Init priority"
@@ -60,28 +55,9 @@ config QSPI_0_OP_MODES
 
 endif # QSPI_0
 
-config QSPI_1
-	bool "QSPI port 1"
-	help
-	  Enable QSPI controller port 1.
 
-
-#source "drivers/qspi/Kconfig.stm32"
-
-#source "drivers/qspi/Kconfig.dw"
-
-#source "drivers/qspi/Kconfig.mcux_dspi"
-
-#source "drivers/qspi/Kconfig.mcux_lpspi"
-
-#source "drivers/qspi/Kconfig.sam"
-
-#source "drivers/qspi/Kconfig.sam0"
-
-#source "drivers/qspi/Kconfig.sifive"
 
 source "drivers/qspi/Kconfig.nrfx"
 
-#source "drivers/qspi/Kconfig.cc13xx_cc26xx"
 
 endif # QSPI
