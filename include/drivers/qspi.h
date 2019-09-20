@@ -47,6 +47,9 @@ extern "C" {
  */
 #define QSPI_MODE_CPHA		BIT(1)
 
+#define QSPI_MODE_MASK		(0x3)
+#define QSPI_MODE_GET(_mode_)			\
+	((_mode_) & QSPI_MODE_MASK)
 /**
  * @brief QSPI CS delay.
  */
@@ -76,9 +79,9 @@ extern "C" {
  * Quad data line SPI. READ4O (opcode 0x6B).
  * Quad data line SPI. READ4IO (opcode 0xEB).
  */
-#define QSPI_DATA_LINES_SINGLE	0x01
-#define QSPI_DATA_LINES_DOUBLE	0x02
-#define QSPI_DATA_LINES_QUAD	0x03
+#define QSPI_DATA_LINES_SINGLE	0x00
+#define QSPI_DATA_LINES_DOUBLE	0x01
+#define QSPI_DATA_LINES_QUAD	0x02
 
 #define QSPI_DATA_LINES_FIELD_SIZE	0x03
 #define QSPI_DATA_LINES_SHIFT	(10)
@@ -95,8 +98,7 @@ extern "C" {
  */
 
 /**
- * No of clock cycles when CS must remain high between two read/write
- * operations
+ * Length of the address field. Typical flash chips support 24bit address mode
  * 0x00	-	8 bit address
  * 0x01	-	16 bit address
  * 0x02	-	24 bit address
@@ -156,7 +158,6 @@ struct qspi_cs_control {
  *     data_lines 	       [ 10 : 11 ] - Defines how many lines will be used for read operation
  *     address             [ 12 : 13 ] - Defines how many bits are used for address
  *     RFU	               [ 14 : 15 ] - RFU
- * @param slave is the slave number from 0 to host controller slave limit.
  * @param cs is a valid pointer on a struct qspi_cs_control is CS line is
  *    emulated through a gpio line, or NULL otherwise.
  *
@@ -164,35 +165,9 @@ struct qspi_cs_control {
  * transceive call. Rest of the attributes are not meant to be tweaked.
  */
 volatile struct qspi_config {
-	u32_t		prescaler;
+	u32_t		frequency;
 	u16_t		operation;
-	u16_t		slave;
-
 	const struct qspi_cs_control *cs;
-};
-
-/**
- * @brief QSPI buffer structure
- *
- * @param buf is a valid pointer on a data buffer, or NULL otherwise.
- * @param len is the length of the buffer or, if buf is NULL, will be the
- *    length which as to be sent as dummy bytes (as TX buffer) or
- *    the length of bytes that should be skipped (as RX buffer).
- */
-struct qspi_buf {
-	void *buf;
-	size_t len;
-};
-
-/**
- * @brief QSPI buffer array structure
- *
- * @param buffers is a valid pointer on an array of qspi_buf, or NULL.
- * @param count is the length of the array pointed by buffers.
- */
-struct qspi_buf_set {
-	const struct qspi_buf *buffers;
-	size_t count;
 };
 
 /**
@@ -212,7 +187,7 @@ typedef int (*qspi_api_io)(struct device *dev,
 /**
  * @typedef qspi_api_write
  * @brief Callback API for I/O
- * See qspi_transceive() for argument descriptions
+ * See qspi_write() for argument descriptions
  */
 typedef int (*qspi_api_write)(struct device *dev,
 			  const struct qspi_config *config,
@@ -224,7 +199,7 @@ typedef int (*qspi_api_write)(struct device *dev,
 /**
  * @typedef qspi_api_read
  * @brief Callback API for I/O
- * See qspi_transceive() for argument descriptions
+ * See qspi_read() for argument descriptions
  */
 typedef int (*qspi_api_read)(struct device *dev,
 			  const struct qspi_config *config,
@@ -265,10 +240,21 @@ struct qspi_driver_api {
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param config Pointer to a valid qspi_config structure instance.
- * @param tx_bufs Buffer array where data to be sent originates from,
+ * @param tx_buf Buffer where data to be sent originates from,
  *        or NULL if none.
- * @param rx_bufs Buffer array where data to be read will be written to,
+ * @param tx_len Amount of data to be transmitted from tx_buf. Value in bytes,
+ *        or 0 if none.
+ *
+ * @param rx_bufs Buffer where data to be read will be written to,
  *        or NULL if none.
+ * @param rx_len Amount of data to be received to rx_buf. Value in bytes,
+ *        or 0 if none.
+ *
+ * @param op_code Operation code to be sent. It is defined in the flash manufacture's datasheet. One byte value,
+ *        or 0 if none.
+ *
+ * @param address Addres where the operation will take place (i.e erase). Four byte value,
+ *        or (-1) if none.
  *
  * @retval 0 If successful, negative errno code otherwise. In case of slave
  *         transaction: if successful it will return the amount of frames
@@ -305,8 +291,10 @@ static inline int z_impl_qspi_cmd_xfer(struct device *dev,
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param config Pointer to a valid qspi_config structure instance.
- * @param rx_bufs Buffer array where data to be read will be written to.
- * @param address Address from the data will be read
+ * @param rx_bufs Amount of data to be received to rx_buf.
+ * @param len Amount of data to be received to rx_buf.
+ * @param address Addres where the operation will take place (i.e erase). Four byte value,
+ *        or (-1) if none.
  *
  * @retval 0 If successful, negative errno code otherwise.
  *
@@ -338,8 +326,9 @@ static inline int z_impl_qspi_read(struct device *dev,
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param config Pointer to a valid qspi_config structure instance.
- * @param tx_bufs Buffer array where data to be sent originates from.
- * @param address Address where the data will be written
+ * @param tx_buf Buffer where data to be sent originates from.
+ * @param address Address where the data will be written. Four byte value,
+ *        or (-1) if none.
  *
  * @retval 0 If successful, negative errno code otherwise.
  *
