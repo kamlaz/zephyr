@@ -125,7 +125,7 @@ static inline void qspi_context_cs_configure(struct qspi_context *ctx)
 				   ctx->config->cs->gpio_pin, GPIO_DIR_OUT);
 		gpio_pin_write(ctx->config->cs->gpio_dev,
 			       ctx->config->cs->gpio_pin,
-			       qspi_context_cs_inactive_value(ctx));
+				   CS_LOW);//qspi_context_cs_inactive_value(ctx));
 	} else {
 		LOG_INF("CS control inhibited (no GPIO device)");
 	}
