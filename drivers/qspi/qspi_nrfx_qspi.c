@@ -250,7 +250,7 @@ static inline void fill_config_struct(nrfx_qspi_config_t * pConfig, const struct
 static int configure(struct device *dev, const struct qspi_config *qspi_cfg)
 {
 	struct qspi_context *ctx = &get_dev_data(dev)->ctx;
-	const nrfx_qspi_config_t * p_config = &get_dev_config(dev)->config;
+//	const nrfx_qspi_config_t * p_config = &get_dev_config(dev)->config;
 
 	if (qspi_context_configured(ctx, qspi_cfg)) {
 		/* Already configured. No need to do it again. */
@@ -346,10 +346,10 @@ static void transceive_next_chunk(struct device *dev)
 		LOG_DBG("Transaction finished with status %d", error);
 
 		dev_data->busy = false;
-		return error;
+		return;
 	}
 	else{
-		return result;
+		return;
 	}
 }
 

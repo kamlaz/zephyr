@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Intel Corporation.
+ * Copyright (c) 2019 Nordic Semiconductor ASA.
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <string.h>
 
-LOG_MODULE_REGISTER(qspi, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(qspi_flash, LOG_LEVEL_DBG);
 
 #if defined(TCA2_INTEGRATION)
 #include "target_comm.h"
@@ -46,7 +46,7 @@ struct qspi_config qspi_cfg;		// Config for qspi device
 static void qspi_configure(struct qspi_config * pCfg);
 
 /* TESTING FUNCTIONS */
-uint8_t memory_test(uint32_t length);
+uint32_t memory_test(uint32_t length);
 uint32_t read_device_id(void);
 
 /* Private functions ---------------------------------------------------------*/
@@ -73,7 +73,7 @@ void main(void)
 	LOG_INF("Vendor ID: %x", read_device_id());
 
 	/* Perform the test */
-	memory_test(4096);
+	memory_test(4);
 
 #if defined(TCA2_INTEGRATION)
 	while (1) {
@@ -123,7 +123,7 @@ uint32_t read_device_id(void){
  * @param length	length of the tests in bytes
  * @retval 0 If successful, errno code otherwise.
  */
-uint8_t memory_test(uint32_t length){
+uint32_t memory_test(uint32_t length){
 	LOG_INF("memory_test(%d)", length);
 
 	/* Check input parameter */
@@ -156,7 +156,7 @@ uint8_t memory_test(uint32_t length){
 		if(chip_mem[i] != 0xFF)
 		{
 			LOG_WRN("Memory read incorrect %d = %x", i, chip_mem[i]);
-			return 4;
+		return 4;
 		}
 	}
 
@@ -203,3 +203,4 @@ uint8_t memory_test(uint32_t length){
 
 	return 0;
 }
+

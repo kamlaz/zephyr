@@ -164,7 +164,7 @@ struct qspi_cs_control {
  * @note Only cs_hold and lock_on can be changed between consecutive
  * transceive call. Rest of the attributes are not meant to be tweaked.
  */
-volatile struct qspi_config {
+struct qspi_config {
 	u32_t		frequency;
 	u16_t		operation;
 	const struct qspi_cs_control *cs;
