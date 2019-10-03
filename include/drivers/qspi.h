@@ -72,20 +72,15 @@ extern "C" {
  */
 
 /**
- * No of clock cycles when CS must remain high between two read/write
- * operations
- * Dual data line SPI. READ2O (opcode 0x3B).
- * Dual data line SPI. READ2IO (opcode 0xBB).
- * Quad data line SPI. READ4O (opcode 0x6B).
- * Quad data line SPI. READ4IO (opcode 0xEB).
+ * No of data lines that are used for the transfer
  */
-#define QSPI_DATA_LINES_SINGLE	0x00
-#define QSPI_DATA_LINES_DOUBLE	0x01
-#define QSPI_DATA_LINES_QUAD	0x02
+#define QSPI_DATA_LINES_SINGLE			0x00
+#define QSPI_DATA_LINES_DOUBLE			0x01
+#define QSPI_DATA_LINES_QUAD			0x02
 
-#define QSPI_DATA_LINES_FIELD_SIZE	0x03
-#define QSPI_DATA_LINES_SHIFT	(10)
-#define QSPI_DATA_LINES_MASK	(QSPI_DATA_LINES_FIELD_SIZE << QSPI_DATA_LINES_SHIFT)
+#define QSPI_DATA_LINES_FIELD_SIZE		0x03
+#define QSPI_DATA_LINES_SHIFT			(10)
+#define QSPI_DATA_LINES_MASK			(QSPI_DATA_LINES_FIELD_SIZE << QSPI_DATA_LINES_SHIFT)
 #define QSPI_DATA_LINES_GET(_operation_)					\
 	(((_operation_) & QSPI_DATA_LINES_MASK) >> QSPI_DATA_LINES_SHIFT)
 
@@ -104,13 +99,13 @@ extern "C" {
  * 0x02	-	24 bit address
  * 0x03	-	32 bit address
  */
-#define QSPI_ADDRESS_MODE_8BIT	0x00
-#define QSPI_ADDRESS_MODE_16BIT	0x01
-#define QSPI_ADDRESS_MODE_24BIT	0x02
-#define QSPI_ADDRESS_MODE_32BIT	0x03
+#define QSPI_ADDRESS_MODE_8BIT			0x00
+#define QSPI_ADDRESS_MODE_16BIT			0x01
+#define QSPI_ADDRESS_MODE_24BIT			0x02
+#define QSPI_ADDRESS_MODE_32BIT			0x03
 
 #define QSPI_ADDRESS_MODE_FIELD_SIZE	0x03
-#define QSPI_ADDRESS_MODE_SHIFT	(12)
+#define QSPI_ADDRESS_MODE_SHIFT			(12)
 #define QSPI_ADDRESS_MODE_MASK	(QSPI_ADDRESS_MODE_FIELD_SIZE << QSPI_ADDRESS_MODE_SHIFT)
 #define QSPI_ADDRESS_MODE_GET(_operation_)					\
 	(((_operation_) & QSPI_ADDRESS_MODE_MASK) >> QSPI_ADDRESS_MODE_SHIFT)
@@ -143,8 +138,8 @@ extern "C" {
  */
 struct qspi_cs_control {
 	struct device	*gpio_dev;
-	u32_t		gpio_pin;
-	u32_t		delay;
+	u32_t			gpio_pin;
+	u32_t			delay;
 };
 
 /**
@@ -234,7 +229,7 @@ struct qspi_driver_api {
 };
 
 /**
- * @brief Read/write the specified amount of data from the QSPI driver.
+ * @brief Sends custom command.
  *
  * Note: This function is synchronous.
  *

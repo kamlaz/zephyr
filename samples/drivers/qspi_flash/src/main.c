@@ -43,11 +43,14 @@ struct device *qspi;				// Defines pointer to qspi device
 struct qspi_config qspi_cfg;		// Config for qspi device
 
 /* Private function prototypes -----------------------------------------------*/
-static void qspi_configure(struct qspi_config * pCfg);
+//static void qspi_configure(struct qspi_config * pCfg);
+static void qspi_configure(void);
+void qspi_init(uint32_t frequency, uint8_t addressMode, uint8_t dataLines);
 
 /* TESTING FUNCTIONS */
 uint32_t memory_test(uint32_t length);
 uint32_t read_device_id(void);
+uint32_t memory_complex_test(uint32_t length);
 
 /* Private functions ---------------------------------------------------------*/
 void main(void)
@@ -67,14 +70,16 @@ void main(void)
 	}
 
 	/* Assign config */
-	qspi_configure(&qspi_cfg);
+//	qspi_configure(&qspi_cfg);
+//	qspi_configure();
+	qspi_init(8000000,QSPI_ADDRESS_MODE_24BIT, QSPI_DATA_LINES_QUAD);
 
 	/* Identify the flash */
 	LOG_INF("Vendor ID: %x", read_device_id());
 
 	/* Perform the test */
 	memory_test(4);
-
+	memory_complex_test(4);
 #if defined(TCA2_INTEGRATION)
 	while (1) {
 		tca_send_and_receive(&g_target_comm);
@@ -84,18 +89,43 @@ void main(void)
 	LOG_INF("End.");
 }
 
+
+
 /**
  * @brief Configures QSPI peripherial
  *
  * @param pCfg	- pointer to the qspi structure
  * @retval None
  */
-static void qspi_configure(struct qspi_config * pCfg){
-	pCfg->frequency = 8000000;
-	pCfg->operation = (	QSPI_CS_DELAY_SET(8) 							|
-						QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)		|
+//static void qspi_configure(struct qspi_config * pCfg){
+//	pCfg->frequency = 8000000;
+//	pCfg->operation = (	QSPI_CS_DELAY_SET(8) 							|
+//						QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)		|
+//						QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
+//}
+static void qspi_configure(void){
+	qspi_cfg.frequency = 8000000;
+	qspi_cfg.operation = (	QSPI_CS_DELAY_SET(8) 							|
+						QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)			|
 						QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
 }
+//---------------------------------------------------------------------------		TEST FUNCTIONS
+
+/**
+ * @brief Initialises QSPI peripherial - API for testing purposes
+ *
+ * @param frequency		- Desired frequency of the QSPI bus.
+ * @param addressMode	- Mode of addressing
+ * @param addressMode	- Mode of used datalines (1,2 or 4)
+ * @retval None
+ */
+void qspi_init(uint32_t frequency, uint8_t addressMode, uint8_t dataLines){
+	qspi_cfg.frequency = frequency;
+	qspi_cfg.operation = (	QSPI_CS_DELAY_SET(8) 				|
+						QSPI_DATA_LINES_SET(dataLines)			|
+						QSPI_ADDRESS_MODE_SET(addressMode));
+}
+
 
 /**
  * @brief Reads device ID (JEDEC ID)
@@ -197,6 +227,7 @@ uint32_t memory_test(uint32_t length){
 		}
 	}
 
+
 	printf("OK");
 
 	LOG_INF("Memory test OK");
@@ -204,3 +235,33 @@ uint32_t memory_test(uint32_t length){
 	return 0;
 }
 
+/**
+ * @brief Performs comples test of the QSPI FLASH memory and QSPI bus
+ * This tests changes QSPI configuration and check
+ *
+ * @param length	length of the tests in bytes
+ * @retval 0 If successful, errno code otherwise.
+ */
+uint32_t memory_complex_test(uint32_t length){
+	uint32_t result = 0;
+	uint32_t success = 0;
+	/* Testing frequencies */
+	for (uint8_t i = 0; i<16; i++){
+		/* Testing addresses */
+		for(uint8_t j=0;j<4;j++){
+			/* Testing data lines */
+			for (uint8_t k = 0; k<4;k++){
+				qspi_init( ((i+1)*1000000), j, k);
+				if(memory_test(length) != 0){
+					result++;
+				}
+				else{
+					success++;
+				}
+			}
+		}
+	}
+	printf("\nFailed: %d", result);
+	printf("\nPassed: %d", success);
+	return result;
+}
