@@ -5,13 +5,12 @@
 
 include: base.yaml
 
-parent:
-    bus: qspi
+parent-bus: qspi
 
 properties:
     reg:
       required: true
-    spi-max-frequency:
+    qspi-max-frequency:
       type: int
       required: true
       description: Maximum clock frequency of device's QSPI interface in Hz
