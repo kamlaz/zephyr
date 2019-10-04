@@ -493,7 +493,6 @@ static void receive_next_chunk(struct device *dev)
 		nrfx_err_t result;
 
 		dev_data->chunk_len = chunk_len;
-		return
 		result = nrfx_qspi_read(ctx->rx_buf, chunk_len, ctx->address);
 
 		if (result == NRFX_SUCCESS) {
