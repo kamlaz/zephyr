@@ -710,7 +710,7 @@ static int qspi_enable_quad_transfer(void){
 	uint32_t cmd = QSPI_STD_CMD_QE;
 	nrf_qspi_cinstr_conf_t cinstr_cfg = {
 		.opcode = QSPI_STD_CMD_WRSR,
-		.length = NRF_QSPI_CINSTR_LEN_2B,
+		.length = NRF_QSPIstatic const struct_CINSTR_LEN_2B,
 		.io2_level = true,
 		.io3_level = true,
 		.wipwait = true,

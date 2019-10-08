@@ -41,14 +41,13 @@ config SPI_3
 	default y
 
 endif # SPI
-#----------------------------	QSPI 
+
 if QSPI
 
 config QSPI_0
 	default y
 
 endif # QSPI
-#----------------------------	QSPI 
 
 if USB
 

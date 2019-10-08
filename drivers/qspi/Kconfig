@@ -40,23 +40,6 @@ config	QSPI_0
 	help
 	  Enable QSPI controller port 0.
 
-if QSPI_0
-
-config QSPI_0_OP_MODES
-	int "Port 0 supported operation modes (master/slave/both)"
-	default 1
-	range 1 3
-	help
-	  This sets the supported operation modes at runtime, by the QSPI
-	  port 0, where:
-	  1 is MASTER mode only (default)
-	  2 is SLAVE mode only
-	  3 is both modes are available.
-
-endif # QSPI_0
-
-
-
 source "drivers/qspi/Kconfig.nrfx"
 
 

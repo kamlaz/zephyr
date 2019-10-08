@@ -48,7 +48,7 @@ extern "C" {
 #define QSPI_MODE_CPHA		BIT(1)
 
 #define QSPI_MODE_MASK		(0x3)
-#define QSPI_MODE_GET(_mode_)			\
+#define QSPI_MODE_GET(_mode_)						\
 	((_mode_) & QSPI_MODE_MASK)
 /**
  * @brief QSPI CS delay.
@@ -58,13 +58,13 @@ extern "C" {
  * No of clock cycles when CS must remain high between two read/write
  * operations
  */
-#define QSPI_CS_DELAY_FIELD_SIZE	0xFF
+#define QSPI_CS_DELAY_FIELD_SIZE		0xFF
 #define QSPI_CS_DELAY_SHIFT	(2)
 #define QSPI_CS_DELAY_MASK	(QSPI_CS_DELAY_FIELD_SIZE << QSPI_CS_DELAY_SHIFT)
-#define QSPI_CS_DELAY_GET(_operation_)					\
+#define QSPI_CS_DELAY_GET(_operation_)				\
 	(((_operation_) & QSPI_CS_DELAY_MASK) >> QSPI_CS_DELAY_SHIFT)
 
-#define QSPI_CS_DELAY_SET(_cs_delay_)		\
+#define QSPI_CS_DELAY_SET(_cs_delay_)				\
 	((_cs_delay_) << QSPI_CS_DELAY_SHIFT)
 
 /**
@@ -123,61 +123,63 @@ extern "C" {
 #define QSPI_RFU_14		BIT(14)
 #define QSPI_RFU_15		BIT(15)
 
-/**
- * @brief QSPI Chip Select control structure
- *
- * This can be used to control a CS line via a GPIO line, instead of
- * using the controller inner CS logic.
- *
- * @param gpio_dev is a valid pointer to an actual GPIO device. A NULL pointer
- *        can be provided to full inhibit CS control if necessary.
- * @param gpio_pin is a number representing the gpio PIN that will be used
- *    to act as a CS line
- * @param delay is a delay in microseconds to wait before starting the
- *    transmission and before releasing the CS line
- */
-struct qspi_cs_control {
-	struct device	*gpio_dev;
-	u32_t			gpio_pin;
-	u32_t			delay;
-};
+
+ /**
+  * @brief Pins configuration.
+  */
+ typedef struct
+ {
+	 struct device	*gpio_dev;	/**< Pointer to GPIO device. */
+	 u32_t sck_pin; 			/**< SCK pin number. */
+	 u32_t csn_pin; 			/**< Chip select pin number. */
+	 u32_t io0_pin; 			/**< IO0/MOSI pin number. */
+	 u32_t io1_pin; 			/**< IO1/MISO pin number. */
+	 u32_t io2_pin; 			/**< IO2 pin number (optional).*/
+	 u32_t io3_pin; 			/**< IO3 pin number (optional).*/
+ }qspi_pins;
+
 
 /**
  * @brief QSPI controller configuration structure
  *
- * @param frequency is the bus frequency in Hertz
- * @param operation is a bit field with the following parts:
+ * @param pins 		- structure that contains pins used by QSPI driver
+ * @param frequency - the bus frequency in Hertz
+ * @param operation - bit field with the following parts:
  *
  *     mode		   		   [ 0 : 1 ]   - Polarity, phase
- *     cs_delay            [ 2 : 9 ]   - CS delay. No of clock cycles when CS must remain high between two read/write operations
- *     data_lines 	       [ 10 : 11 ] - Defines how many lines will be used for read operation
+ *     cs_high_time        [ 2 : 9 ]   - Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands.
+ *     data_lines 	       [ 10 : 11 ] - Defines how many lines will be used for read/write operation
  *     address             [ 12 : 13 ] - Defines how many bits are used for address
  *     RFU	               [ 14 : 15 ] - RFU
- * @param cs is a valid pointer on a struct qspi_cs_control is CS line is
- *    emulated through a gpio line, or NULL otherwise.
- *
- * @note Only cs_hold and lock_on can be changed between consecutive
- * transceive call. Rest of the attributes are not meant to be tweaked.
  */
 struct qspi_config {
+	qspi_pins 	pins;
 	u32_t		frequency;
 	u16_t		operation;
-	const struct qspi_cs_control *cs;
 };
+
+
+/**
+ * @brief QSPI buffer structure
+ *
+ * @param buf is a valid pointer on a data buffer, or NULL otherwise.
+ * @param len is the length of the buffer or, if buf is NULL, will be the
+ *    length which as to be sent as dummy bytes (as TX buffer) or
+ *    the length of bytes that should be skipped (as RX buffer).
+ */
+struct qspi_buf {
+	void *buf;
+	size_t len;
+};
+
 
 /**
  * @typedef qspi_api_io
  * @brief Callback API for I/O
  * See qspi_transceive() for argument descriptions
  */
-typedef int (*qspi_api_io)(struct device *dev,
-			  const struct qspi_config *config,
-			  const void *tx_buf,
-			  size_t tx_len,
-			  const void *rx_buf,
-			  size_t rx_len,
-			  u32_t op_code,
-			  u32_t address);
+typedef int (*qspi_api_config)(struct device *dev,
+				const struct qspi_config *config);
 
 /**
  * @typedef qspi_api_write
@@ -185,11 +187,8 @@ typedef int (*qspi_api_io)(struct device *dev,
  * See qspi_write() for argument descriptions
  */
 typedef int (*qspi_api_write)(struct device *dev,
-			  const struct qspi_config *config,
-			  const void * tx_buf,
-			  size_t len,
-			  uint32_t address);
-
+				const struct qspi_buf *tx_buf,
+				u32_t address);
 
 /**
  * @typedef qspi_api_read
@@ -197,19 +196,28 @@ typedef int (*qspi_api_write)(struct device *dev,
  * See qspi_read() for argument descriptions
  */
 typedef int (*qspi_api_read)(struct device *dev,
-			  const struct qspi_config *config,
-			  const void * rx_buf,
-			  size_t len,
-			  uint32_t address);
-
+				const struct qspi_buf *rx_buf,
+				u32_t address);
 
 /**
- * @typedef qspi_api_release
- * @brief Callback API for unlocking QSPI device.
- * See qspi_release() for argument descriptions
+ * @typedef qspi_api_xfer
+ * @brief Callback API for I/O
+ * See qspi_transceive() for argument descriptions
  */
-typedef int (*qspi_api_release)(struct device *dev,
-			       const struct qspi_config *config);
+typedef int (*qspi_api_cmd_xfer)(struct device *dev,
+				const struct qspi_buf *tx_buf,
+				const struct qspi_buf *rx_buf,
+				u32_t address);
+
+/**
+ * @typedef qspi_api_erase
+ * @brief Callback API for I/O
+ * See qspi_erase() for argument descriptions
+ */
+typedef int (*qspi_api_erase)(struct device *dev,
+				u32_t start_address,
+				u32_t length);
+
 
 
 /**
@@ -219,14 +227,15 @@ typedef int (*qspi_api_release)(struct device *dev,
  * @param transceive - us
  */
 struct qspi_driver_api {
-	qspi_api_io 	cmd_xfer;
-	qspi_api_write 	write;
-	qspi_api_read 	read;
-#ifdef CONFIG_QSPI_ASYNC
-	qspi_api_io_async transceive_async;
-#endif /* CONFIG_QSPI_ASYNC */
-	qspi_api_release release;
+	qspi_api_config 	configure;
+	qspi_api_write 		write;
+	qspi_api_read 		read;
+	qspi_api_cmd_xfer 	cmd_xfer;
+	qspi_api_erase 		erase;
 };
+
+
+
 
 /**
  * @brief Sends custom command.
