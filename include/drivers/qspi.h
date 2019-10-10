@@ -48,29 +48,6 @@ extern "C" {
  */
 #define QSPI_MODE_CPHA		BIT(1)
 
-#define QSPI_MODE_MASK		(0x3)
-#define QSPI_MODE_GET(_mode_)						\
-	((_mode_) & QSPI_MODE_MASK)
-/**
- * @brief QSPI CS delay.
- */
-
-/**
- * No of clock cycles when CS must remain high between two read/write
- * operations
- */
-#define QSPI_CS_DELAY_FIELD_SIZE		0xFF
-#define QSPI_CS_DELAY_SHIFT	(2)
-#define QSPI_CS_DELAY_MASK	(QSPI_CS_DELAY_FIELD_SIZE << QSPI_CS_DELAY_SHIFT)
-#define QSPI_CS_DELAY_GET(_operation_)				\
-	(((_operation_) & QSPI_CS_DELAY_MASK) >> QSPI_CS_DELAY_SHIFT)
-
-#define QSPI_CS_DELAY_SET(_cs_delay_)				\
-	((_cs_delay_) << QSPI_CS_DELAY_SHIFT)
-
-/**
- * @brief QSPI Read data lines
- */
 
 /**
  * No of data lines that are used for the transfer
@@ -79,21 +56,8 @@ extern "C" {
 #define QSPI_DATA_LINES_DOUBLE			0x01
 #define QSPI_DATA_LINES_QUAD			0x02
 
-#define QSPI_DATA_LINES_FIELD_SIZE		0x03
-#define QSPI_DATA_LINES_SHIFT			(10)
-#define QSPI_DATA_LINES_MASK			(QSPI_DATA_LINES_FIELD_SIZE << QSPI_DATA_LINES_SHIFT)
-#define QSPI_DATA_LINES_GET(_operation_)					\
-	(((_operation_) & QSPI_DATA_LINES_MASK) >> QSPI_DATA_LINES_SHIFT)
-
-#define QSPI_DATA_LINES_SET(_read_data_lines_)		\
-	((_read_data_lines_) << QSPI_DATA_LINES_SHIFT)
-
-
 /**
  * @brief QSPI Address configuration
- */
-
-/**
  * Length of the address field. Typical flash chips support 24bit address mode
  * 0x00	-	8 bit address
  * 0x01	-	16 bit address
@@ -105,72 +69,27 @@ extern "C" {
 #define QSPI_ADDRESS_MODE_24BIT			0x02
 #define QSPI_ADDRESS_MODE_32BIT			0x03
 
-#define QSPI_ADDRESS_MODE_FIELD_SIZE	0x03
-#define QSPI_ADDRESS_MODE_SHIFT			(12)
-#define QSPI_ADDRESS_MODE_MASK	(QSPI_ADDRESS_MODE_FIELD_SIZE << QSPI_ADDRESS_MODE_SHIFT)
-#define QSPI_ADDRESS_MODE_GET(_operation_)					\
-	(((_operation_) & QSPI_ADDRESS_MODE_MASK) >> QSPI_ADDRESS_MODE_SHIFT)
-
-#define QSPI_ADDRESS_MODE_SET(_address_)		\
-	((_address_) << QSPI_ADDRESS_MODE_SHIFT)
-
-/**
- * @brief QSPI RFU bits
- */
-
-/**
- * Not used. Write/read does not impact functionality of the driver.
- */
-#define QSPI_RFU_14		BIT(14)
-#define QSPI_RFU_15		BIT(15)
-
-
- /**
-  * @brief Pins configuration.
-  */
- typedef struct
- {
-	 struct device	*gpio_dev;	/**< Pointer to GPIO device. */
-	 u32_t sck_pin; 			/**< SCK pin number. */
-	 u32_t csn_pin; 			/**< Chip select pin number. */
-	 u32_t io0_pin; 			/**< IO0/MOSI pin number. */
-	 u32_t io1_pin; 			/**< IO1/MISO pin number. */
-	 u32_t io2_pin; 			/**< IO2 pin number (optional).*/
-	 u32_t io3_pin; 			/**< IO3 pin number (optional).*/
- }qspi_pins;
-
-
 /**
  * @brief QSPI controller configuration structure
- *
- * @param pins 		- structure that contains pins used by QSPI driver
- * @param frequency - the bus frequency in Hertz
- * @param operation - bit field with the following parts:
- *
- *     mode		   		   [ 0 : 1 ]   - Polarity, phase
- *     cs_high_time        [ 2 : 9 ]   - Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands.
- *     data_lines 	       [ 10 : 11 ] - Defines how many lines will be used for read/write operation
- *     address             [ 12 : 13 ] - Defines how many bits are used for address (8/16/24/32)
- *     RFU	               [ 14 : 15 ] - RFU
  */
 struct qspi_config {
-
-	u32_t		cs_pin;
+	 /* Chip Select pin used to select memory */
+	u32_t cs_pin;
 
 	/* Frequency of the QSPI */
-	u32_t		frequency;
+	u32_t frequency;
 
 	/* Polarity, phase */
-	uint8_t     mode:1;
+	u8_t mode:1;
 
 	/* Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands. */
-	uint8_t     cs_high_time;
+	u8_t cs_high_time;
 
 	/* Defines how many lines will be used for read/write operation */
-	uint8_t     data_lines:2;
+	u8_t data_lines:2;
 
 	/* Defines how many bits are used for address (8/16/24/32) */
-	uint8_t     address:2;
+	u8_t address:2;
 };
 
 
@@ -202,7 +121,7 @@ typedef int (*qspi_api_set_act_mem)(struct device *dev,
  * See qspi_write() for argument descriptions
  */
 typedef int (*qspi_api_write)(struct device *dev,
-				const struct net_buf *tx_buf,
+				const struct qspi_buf *tx_buf,
 				u32_t address);
 
 /**
@@ -211,7 +130,7 @@ typedef int (*qspi_api_write)(struct device *dev,
  * See qspi_read() for argument descriptions
  */
 typedef int (*qspi_api_read)(struct device *dev,
-				const struct net_buf *rx_buf,
+				const struct qspi_buf *rx_buf,
 				u32_t address);
 
 /**
@@ -220,8 +139,8 @@ typedef int (*qspi_api_read)(struct device *dev,
  * See qspi_transceive() for argument descriptions
  */
 typedef int (*qspi_api_send_cmd)(struct device *dev,
-				const struct net_buf *tx_buf,
-				const struct net_buf *rx_buf);
+				const struct qspi_buf *tx_buf,
+				const struct qspi_buf *rx_buf);
 
 /**
  * @typedef qspi_api_erase
@@ -240,10 +159,10 @@ typedef int (*qspi_api_erase)(struct device *dev,
  * @param transceive - us
  */
 struct qspi_driver_api {
-	qspi_api_write 		write;
-	qspi_api_read 		read;
-	qspi_api_send_cmd 	send_cmd;
-	qspi_api_erase 		erase;
+	qspi_api_write 			write;
+	qspi_api_read 			read;
+	qspi_api_send_cmd 		send_cmd;
+	qspi_api_erase 			erase;
 	qspi_api_set_act_mem 	set_act_mem;
 
 };
