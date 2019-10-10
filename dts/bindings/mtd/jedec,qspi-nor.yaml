@@ -11,6 +11,44 @@ compatible: "jedec,qspi-nor"
 include: qspi-device.yaml
 
 properties:
+  wp-gpios:
+    type: phandle-array
+    required: false
+    description: WPn pin
+  hold-gpios:
+    type: phandle-array
+    required: false
+    description: HOLDn pin
+  reset-gpios:
+    type: phandle-array
+    required: false
+    description: RESETn pin
+
+  frequency:
+    type: int
+    required: true
+    description: Specify operational frequency
+
+  spi-mode:
+    type: int
+    required: true
+    description: Specify desired SPI mode
+
+  data-lines:
+    type: int
+    required: true
+    description: Specify how many data lines are used
+
+  address-size:
+    type: int
+    required: true
+    description: Specify how many bits are used for addressing
+
+  cs-high-time:
+    type: int
+    required: true
+    description: Specify how many bits are used for addressing
+
   jedec-id:
     type: uint8-array
     required: true
@@ -28,28 +66,6 @@ properties:
 
   size:
     type: int
-    required: false
+    required: true
     description: flash capacity in bits
 
-  used-data-lines:
-    type: int
-    required: false
-    description: Specify how many data lines are used
-	
-  cs-pin:
-    type: int
-    required: false
-    description: CSN pin
-
-  wp-gpios:
-    type: phandle-array
-    required: false
-    description: WPn pin
-  hold-gpios:
-    type: phandle-array
-    required: false
-    description: HOLDn pin
-  reset-gpios:
-    type: phandle-array
-    required: false
-    description: RESETn pin

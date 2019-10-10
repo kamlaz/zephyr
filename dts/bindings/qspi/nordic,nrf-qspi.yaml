@@ -1,70 +1,48 @@
-# Copyright (c) 2018 Peter Bigot Consulting, LLC
+# Copyright (c) 2018 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
-title: QSPI NOR flash devices (JEDEC CFI interface)
+title: Nordic nRF Family QSPI controller
 
 description: >
-  Any QSPI NOR flash that supports the JEDEC CFI interface.
+    This is a representation of the Nordic nRF SPI node
 
-compatible: "jedec,qspi-nor"
+compatible: "nordic,nrf-qspi"
 
-include: qspi-device.yaml
+include: qspi-controller.yaml
 
 properties:
-  wp-gpios:
-    type: phandle-array
-    required: false
-    description: WPn pin
-  hold-gpios:
-    type: phandle-array
-    required: false
-    description: HOLDn pin
-  reset-gpios:
-    type: phandle-array
-    required: false
-    description: RESETn pin
+    reg:
+      required: true
 
-  frequency:
-    type: int
-    required: true
-    description: Specify operational frequency
+    interrupts:
+      required: true
 
-  spi-mode:
-    type: int
-    required: true
-    description: Specify desired SPI mode
+    sck-pin:
+      type: int
+      required: true
+      description: SCK pin
 
-  data-lines:
-    type: int
-    required: true
-    description: Specify how many data lines are used
+    io00-pin:
+      type: int
+      required: true
+      description: IO00 pin
 
-  address-size:
-    type: int
-    required: true
-    description: Specify how many bits are used for addressing
+    io01-pin:
+      type: int
+      required: true
+      description: IO01 pin
 
-  cs-high-time:
-    type: int
-    required: true
-    description: Specify how many bits are used for addressing
+    io02-pin:
+      type: int
+      required: true
+      description: IO02 pin
 
-  jedec-id:
-    type: uint8-array
-    required: true
-    description: JEDEC ID as manufacturer ID, memory type, memory density
+    io03-pin:
+      type: int
+      required: true
+      description: IO03 pin
 
-  has-be32k:
-    type: boolean
-    required: false
-    description: Indicates the device supports the BE32K command
-
-  has-ddr-mode:
-    type: boolean
-    required: false
-    description: Indicates the device supports DDR mode
-
-  size:
-    type: int
-    required: true
-    description: flash capacity in bits
+    max-frequency:
+      type: int
+      required: true
+      description: Maximum frequency for QSPI driver

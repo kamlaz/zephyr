@@ -244,8 +244,6 @@ struct qspi_driver_api {
 	qspi_api_read 		read;
 	qspi_api_send_cmd 	send_cmd;
 	qspi_api_erase 		erase;
-
-	//--------------- IN DEVELOPMENT
 	qspi_api_set_act_mem 	set_act_mem;
 
 };
@@ -327,7 +325,7 @@ __syscall int qspi_cmd_xfer(struct device *dev,
 					u32_t op_code,
 					u32_t address);
 
-static inline int z_impl_qspi_cmd_xfer(struct device *dev,
+static inline	//--------------- IN DEVELOPMENT int z_impl_qspi_cmd_xfer(struct device *dev,
 					const struct qspi_config *config,
 					const void *tx_buf,
 					size_t tx_len,
@@ -354,7 +352,7 @@ static inline int z_impl_qspi_cmd_xfer(struct device *dev,
  * @param address Addres where the operation will take place (i.e erase). Four byte value,
  *        or (-1) if none.
  *
- * @retval 0 If successful, negative errno code otherwise.
+ * @retval 0 	//--------------- IN DEVELOPMENTIf successful, negative errno code otherwise.
  *
  * @note This function is an helper function calling qspi_transceive.
  */
@@ -376,7 +374,7 @@ static inline int z_impl_qspi_read(struct device *dev,
 	return api->read(dev, config, rx_buf, len, address);
 }
 
-
+//--------------- IN DEVELOPMENT
 /**
  * @brief Write the specified amount of data from the QSPI driver.
  *
