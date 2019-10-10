@@ -22,6 +22,7 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <device.h>
+#include <net/buf.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -149,13 +150,27 @@ extern "C" {
  *     mode		   		   [ 0 : 1 ]   - Polarity, phase
  *     cs_high_time        [ 2 : 9 ]   - Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands.
  *     data_lines 	       [ 10 : 11 ] - Defines how many lines will be used for read/write operation
- *     address             [ 12 : 13 ] - Defines how many bits are used for address
+ *     address             [ 12 : 13 ] - Defines how many bits are used for address (8/16/24/32)
  *     RFU	               [ 14 : 15 ] - RFU
  */
 struct qspi_config {
-	qspi_pins 	pins;
+
+	u32_t		cs_pin;
+
+	/* Frequency of the QSPI */
 	u32_t		frequency;
-	u16_t		operation;
+
+	/* Polarity, phase */
+	uint8_t     mode:1;
+
+	/* Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands. */
+	uint8_t     cs_high_time;
+
+	/* Defines how many lines will be used for read/write operation */
+	uint8_t     data_lines:2;
+
+	/* Defines how many bits are used for address (8/16/24/32) */
+	uint8_t     address:2;
 };
 
 
@@ -168,7 +183,7 @@ struct qspi_config {
  *    the length of bytes that should be skipped (as RX buffer).
  */
 struct qspi_buf {
-	void *buf;
+	u8_t *buf;
 	size_t len;
 };
 
@@ -178,7 +193,7 @@ struct qspi_buf {
  * @brief Callback API for I/O
  * See qspi_transceive() for argument descriptions
  */
-typedef int (*qspi_api_config)(struct device *dev,
+typedef int (*qspi_api_set_act_mem)(struct device *dev,
 				const struct qspi_config *config);
 
 /**
@@ -187,7 +202,7 @@ typedef int (*qspi_api_config)(struct device *dev,
  * See qspi_write() for argument descriptions
  */
 typedef int (*qspi_api_write)(struct device *dev,
-				const struct qspi_buf *tx_buf,
+				const struct net_buf *tx_buf,
 				u32_t address);
 
 /**
@@ -196,7 +211,7 @@ typedef int (*qspi_api_write)(struct device *dev,
  * See qspi_read() for argument descriptions
  */
 typedef int (*qspi_api_read)(struct device *dev,
-				const struct qspi_buf *rx_buf,
+				const struct net_buf *rx_buf,
 				u32_t address);
 
 /**
@@ -204,10 +219,9 @@ typedef int (*qspi_api_read)(struct device *dev,
  * @brief Callback API for I/O
  * See qspi_transceive() for argument descriptions
  */
-typedef int (*qspi_api_cmd_xfer)(struct device *dev,
-				const struct qspi_buf *tx_buf,
-				const struct qspi_buf *rx_buf,
-				u32_t address);
+typedef int (*qspi_api_send_cmd)(struct device *dev,
+				const struct net_buf *tx_buf,
+				const struct net_buf *rx_buf);
 
 /**
  * @typedef qspi_api_erase
@@ -219,7 +233,6 @@ typedef int (*qspi_api_erase)(struct device *dev,
 				u32_t length);
 
 
-
 /**
  * @brief QSPI driver API
  * This is the mandatory API any QSPI driver needs to expose.
@@ -227,15 +240,56 @@ typedef int (*qspi_api_erase)(struct device *dev,
  * @param transceive - us
  */
 struct qspi_driver_api {
-	qspi_api_config 	configure;
 	qspi_api_write 		write;
 	qspi_api_read 		read;
-	qspi_api_cmd_xfer 	cmd_xfer;
+	qspi_api_send_cmd 	send_cmd;
 	qspi_api_erase 		erase;
+
+	//--------------- IN DEVELOPMENT
+	qspi_api_set_act_mem 	set_act_mem;
+
 };
 
+//-----------------------------------------		ERROR CODES
+/*
+ * qspi_api_config
+ *	ENXIO No such device or address
+ *	EBUSY device busy
+ *	ECANCELED - operation cancelled (becoise peripherial has been initialised so far)
+ *
+ */
 
+/*
+ * qspi_api_write
+ * 	ENXIO 		- No such device or address
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
 
+/*
+ * qspi_api_read
+ * 	ENXIO 		- No such device or address
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
+
+/*
+ * qspi_api_erase
+ * 	ENXIO 		- No such device
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
+
+/*
+ * qspi_api_cmd_xfer
+ * 	ENXIO 		- No such device
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
 
 /**
  * @brief Sends custom command.
