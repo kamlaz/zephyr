@@ -10,7 +10,7 @@ parent-bus: qspi
 properties:
     reg:
       required: true
-    qspi-max-frequency:
+    frequency:
       type: int
       required: true
       description: Maximum clock frequency of device's QSPI interface in Hz
