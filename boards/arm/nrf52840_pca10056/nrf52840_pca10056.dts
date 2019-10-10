@@ -222,18 +222,23 @@ arduino_spi: &spi3 {
 	io01-pin = <21>;
 	io02-pin = <22>;
     io03-pin = <23>;
-    cs-pins = <17>,<05>;
-	mem1: mem1@0 {
+	max-frequency = <80000000>;
+	mem1: mem1@17 {
 		compatible = "jedec,qspi-nor";
-		reg = <0>;			
-		qspi-max-frequency = <80000000>;
+		reg = <17>;
+		wp-gpios = <&gpio0 22 0>;
+		hold-gpios = <&gpio0 23 0>;
+		reset-gpios = <&gpio0 24 0>;
+		frequency = <16000000>;
+		spi_mode = <3>;
+		data_lines = <4>;
+		address-size = <24>;
+		cs_high_time = <1>;
 		label = "MEM1";
 		jedec-id = [c2 28 17];
 		size = <67108864>;
 		has-be32k;
-		cs-pin = <17>;
-		wp-gpios = <&gpio0 22 0>;
-		hold-gpios = <&gpio0 23 0>;
+		has-ddr-mode;
 	};
 };
 
