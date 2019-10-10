@@ -1,7 +1,7 @@
 # Copyright (c) 2018 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
-title: Nordic nRF Family QSPI Master node
+title: Nordic nRF Family QSPI controller
 
 description: >
     This is a representation of the Nordic nRF SPI node
@@ -16,11 +16,6 @@ properties:
 
     interrupts:
       required: true
-
-    csn-pin:
-      type: int
-      required: true
-      description: CSN pin
 
     sck-pin:
       type: int
@@ -47,3 +42,7 @@ properties:
       required: true
       description: IO03 pin
 
+    cs-pins:
+      type: array
+      required: false
+      description: CSN pin
