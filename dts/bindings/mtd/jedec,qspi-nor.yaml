@@ -21,10 +21,25 @@ properties:
     required: false
     description: Indicates the device supports the BE32K command
 
+  has-ddr-mode:
+    type: boolean
+    required: false
+    description: Indicates the device supports DDR mode
+
   size:
     type: int
     required: false
     description: flash capacity in bits
+
+  used-data-lines:
+    type: int
+    required: false
+    description: Specify how many data lines are used
+	
+  cs-pin:
+    type: int
+    required: false
+    description: CSN pin
 
   wp-gpios:
     type: phandle-array
