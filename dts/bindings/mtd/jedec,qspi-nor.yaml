@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Peter Bigot Consulting, LLC
+# Copyright (c) 2019 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
 title: QSPI NOR flash devices (JEDEC CFI interface)
@@ -11,17 +11,10 @@ compatible: "jedec,qspi-nor"
 include: qspi-device.yaml
 
 properties:
-  wp-gpios:
-    type: phandle-array
-    required: false
-    description: WPn pin
-  hold-gpios:
-    type: phandle-array
-    required: false
-    description: HOLDn pin
-  reset-gpios:
-    type: phandle-array
-    required: false
+
+  cs-pin:
+    type: int
+    required: true
     description: RESETn pin
 
   frequency:
@@ -29,10 +22,10 @@ properties:
     required: true
     description: Specify operational frequency
 
-  spi-mode:
+  qspi-mode:
     type: int
     required: true
-    description: Specify desired SPI mode
+    description: Specify desired QSPI mode
 
   data-lines:
     type: int
@@ -47,12 +40,17 @@ properties:
   cs-high-time:
     type: int
     required: true
-    description: Specify how many bits are used for addressing
+    description: Specify how longs CS pin must stay high between two QSPI operations(in numbers of qspi clock cycles)
 
   jedec-id:
     type: uint8-array
     required: true
     description: JEDEC ID as manufacturer ID, memory type, memory density
+
+  size:
+    type: int
+    required: true
+    description: Flash capacity in bits
 
   has-be32k:
     type: boolean
@@ -63,9 +61,3 @@ properties:
     type: boolean
     required: false
     description: Indicates the device supports DDR mode
-
-  size:
-    type: int
-    required: true
-    description: flash capacity in bits
-

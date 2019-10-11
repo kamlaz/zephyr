@@ -1,10 +1,10 @@
-# Copyright (c) 2018 Nordic Semiconductor ASA
+# Copyright (c) 2019 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
 title: Nordic nRF Family QSPI controller
 
 description: >
-    This is a representation of the Nordic nRF SPI node
+    This is a representation of the Nordic nRF QSPI node
 
 compatible: "nordic,nrf-qspi"
 

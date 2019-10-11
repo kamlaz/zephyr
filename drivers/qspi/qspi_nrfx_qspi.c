@@ -1,3 +1,227 @@
+
+
+/* Includes ------------------------------------------------------------------*/
+#include <sys/__assert.h>
+#include <drivers/qspi.h>
+#include <nrfx_qspi.h>
+#include <stdio.h>
+
+#define LOG_DOMAIN "qspi_nrfx_qspi"
+#define LOG_LEVEL CONFIG_QSPI_LOG_LEVEL
+#include <logging/log.h>
+LOG_MODULE_REGISTER(qspi_nrfx_qspi);
+/* Private define ------------------------------------------------------------*/
+/* Page, sector, and block size are standard, not configurable. */
+/**
+ * @brief QSPI Polarity & Phase Modes
+ */
+
+/**
+ * Clock Polarity: if set, clock idle state will be 1
+ * and active state will be 0. If untouched, the inverse will be true
+ * which is the default.
+ */
+#define QSPI_MODE_CPOL		BIT(0)
+
+/**
+ * Clock Phase: this dictates when is the data captured, and depends
+ * clock's polarity. When QSPI_MODE_CPOL is set and this bit as well,
+ * capture will occur on low to high transition and high to low if
+ * this bit is not set (default). This is fully reversed if CPOL is
+ * not set.
+ */
+#define QSPI_MODE_CPHA		BIT(1)
+
+
+/**
+ * No of data lines that are used for the transfer
+ */
+#define QSPI_DATA_LINES_SINGLE			0x00
+#define QSPI_DATA_LINES_DOUBLE			0x01
+#define QSPI_DATA_LINES_QUAD			0x02
+
+/**
+ * @brief QSPI Address configuration
+ * Length of the address field. Typical flash chips support 24bit address mode
+ * 0x00	-	8 bit address
+ * 0x01	-	16 bit address
+ * 0x02	-	24 bit address
+ * 0x03	-	32 bit address
+ */
+#define QSPI_ADDRESS_MODE_8BIT			0x00
+#define QSPI_ADDRESS_MODE_16BIT			0x01
+#define QSPI_ADDRESS_MODE_24BIT			0x02
+#define QSPI_ADDRESS_MODE_32BmeIT			0x03
+
+#define QSPI_NOR_PAGE_SIZE    	0x0100U
+#define QSPI_NOR_SECTOR_SIZE  	0x1000U
+#define QSPI_NOR_BLOCK_SIZE   	0x10000U
+#define SPI_NOR_BLOCK32_SIZE	0x8000
+
+/* Test whether offset is aligned. */
+#define QSPI_NOR_IS_PAGE_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_PAGE_SIZE - 1U)) == 0)
+#define QSPI_NOR_IS_SECTOR_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_SECTOR_SIZE - 1U)) == 0)
+#define QSPI_NOR_IS_BLOCK_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_BLOCK_SIZE - 1U)) == 0)
+#define QSPI_NOR_IS_BLOCK32_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_BLOCK32_SIZE - 1U)) == 0)
+/* Imported variables --------------------------------------------------------*/
+/* Private variables ---------------------------------------------------------*/
+//struct k_sem qspi_sem;
+struct qspi_buf {
+	u8_t *buf;
+	size_t len;
+};
+
+/* Exported types ------------------------------------------------------------*/
+int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address);
+int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address);
+int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const struct qspi_buf *rx_buf, u32_t address);
+int qspi_nrfx_erase(struct device *dev, u32_t start_address, u32_t length);
+int qspi_nrfx_set_act_mem(struct device *dev, const struct qspi_config *config);
+
+/* API definition */
+static const struct qspi_driver_api qspi_nrfx_driver_api = {
+	.write = qspi_nrfx_write,
+	.read = qspi_nrfx_read,
+	.send_cmd = qspi_nrfx_send_cmd,
+	.erase = qspi_nrfx_erase,
+	.set_act_mem = qspi_nrfx_set_act_mem,
+};
+
+
+/*
+ * qspi_api_write
+ * 	ENXIO 		- No such device or address
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
+int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address){
+	//__ASSERT(tx_buf, "Tx buffer cannot be null!");
+	/* Check input parameters */
+	if (!dev) 		{ return -ENXIO;}
+	if (!tx_buf)	{ return -EINVAL;}
+
+	int result = 0;
+	return nrfx_qspi_write(tx_buf->buf, tx_buf->len, address);
+}
+
+int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address){
+	/* Check input parameters */
+	if (!dev) 		{ return -ENXIO;}
+	if (!rx_buf)	{ return -EINVAL;}
+
+	int result = 0;
+	return nrfx_qspi_read(rx_buf->buf, rx_buf->len, address);
+}
+
+int qspi_nrfx_erase(struct device *dev, u32_t start_address, u32_t length){
+	/* Check input parameters */
+	if (!dev) 		{ return -ENXIO;}
+
+	int result = 0;
+
+	while (length) {
+		if (size == params->size) {		// TODO: investigate
+//			/* chip erase */
+			result = nrfx_qspi_chip_erase();
+//			size -= params->size;
+		} else if ((size >= QSPI_NOR_BLOCK_SIZE)
+				&& QSPI_NOR_IS_BLOCK_ALIGNED(addr)) {
+			/* 64 KiB block erase */
+			nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_64KB,start_address)
+
+			addr += QSPI_NOR_BLOCK_SIZE;
+			size -= QSPI_NOR_BLOCK_SIZE;
+		} else if ((size >= QSPI_NOR_BLOCK32_SIZE)
+				&& QSPI_NOR_IS_BLOCK32_ALIGNED(addr)) {
+			/* 32 KiB block erase */
+			// TODO: ADD FUCTION HERE
+			addr += QSPI_NOR_BLOCK32_SIZE;
+			size -= QSPI_NOR_BLOCK32_SIZE;
+		} else if ((size >= QSPI_NOR_SECTOR_SIZE)
+				&& QSPI_NOR_IS_SECTOR_ALIGNED(addr)) {
+			/* sector erase */
+			snrfx_qspi_erase(NRF_QSPI_ERASE_LEN_4KB,start_address)
+			addr += QSPI_NOR_SECTOR_SIZE;
+			size -= QSPI_NOR_SECTOR_SIZE;
+		} else {
+			/* minimal erase size is at least a sector size */
+			SYNC_UNLOCK();
+			LOG_DBG("unsupported at 0x%lx size %zu", (long)addr,
+					size);
+			return -EINVAL;
+		}
+	}
+}
+/**
+ * @brief QSPI handler
+ * Amount of lines used for transfer
+ *
+ * @param event 	- TBD
+ * @param p_context - TBD
+ * @retval None
+ */
+static void qspi_handler(nrfx_qspi_evt_t event, void * p_context)
+{
+	struct device *dev = p_context;
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+
+	if (event == NRFX_QSPI_EVENT_DONE) {
+	/* Add functionality */
+	}
+}
+
+
+
+
+/*
+ * qspi_api_config
+ *	ENXIO No such device or address
+ *	EBUSY device busy
+ *	ECANCELED - operation cancelled (becoise peripherial has been initialised so far)
+ *
+ */
+
+/*
+ * qspi_api_write
+ * 	ENXIO 		- No such device or address
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
+
+/*
+ * qspi_api_read
+ * 	ENXIO 		- No such device or address
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
+
+/*
+ * qspi_api_erase
+ * 	ENXIO 		- No such device
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
+
+/*
+ * qspi_api_cmd_xfer
+ * 	ENXIO 		- No such device
+ * 	EINVAL 		- invalid input parameter
+ * 	EBUSY 		- device busy
+ * 	ETIMEDOUT	- timeout
+ */
+
+
+
+
+
+
+
+
+
 ///*
 // * Copyright (c) 2017 - 2018, Nordic Semiconductor ASA
 // *
@@ -614,7 +838,7 @@
 //					size_t len,
 //					uint32_t address)
 //{
-//	qspi_context_lock(&get_dev_data(dev)->ctx, false, NULL);
+//	qspi_context_lock(&get_dev_data(dev)->ctx, false, NULL);net_buf
 //
 //	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
 //	int error;
