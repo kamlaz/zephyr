@@ -22,89 +22,63 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <device.h>
-#include <net/buf.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief QSPI Polarity & Phase Modes
+ * @brief QSPI buffer structure
+ *
+ * @param buf is a valid pointer on a data buffer.
+ * @param len is the length of the buffer.
  */
-
-/**
- * Clock Polarity: if set, clock idle state will be 1
- * and active state will be 0. If untouched, the inverse will be true
- * which is the default.
- */
-#define QSPI_MODE_CPOL		BIT(0)
-
-/**
- * Clock Phase: this dictates when is the data captured, and depends
- * clock's polarity. When QSPI_MODE_CPOL is set and this bit as well,
- * capture will occur on low to high transition and high to low if
- * this bit is not set (default). This is fully reversed if CPOL is
- * not set.
- */
-#define QSPI_MODE_CPHA		BIT(1)
-
-
-/**
- * No of data lines that are used for the transfer
- */
-#define QSPI_DATA_LINES_SINGLE			0x00
-#define QSPI_DATA_LINES_DOUBLE			0x01
-#define QSPI_DATA_LINES_QUAD			0x02
-
-/**
- * @brief QSPI Address configuration
- * Length of the address field. Typical flash chips support 24bit address mode
- * 0x00	-	8 bit address
- * 0x01	-	16 bit address
- * 0x02	-	24 bit address
- * 0x03	-	32 bit address
- */
-#define QSPI_ADDRESS_MODE_8BIT			0x00
-#define QSPI_ADDRESS_MODE_16BIT			0x01
-#define QSPI_ADDRESS_MODE_24BIT			0x02
-#define QSPI_ADDRESS_MODE_32BIT			0x03
+struct qspi_buf {
+	u8_t *buf;
+	size_t len;
+};
 
 /**
  * @brief QSPI controller configuration structure
  */
 struct qspi_config {
 	 /* Chip Select pin used to select memory */
-	u32_t cs_pin;
+	u16_t cs_pin;
 
 	/* Frequency of the QSPI */
 	u32_t frequency;
 
-	/* Polarity, phase */
-	u8_t mode:1;
+	/* Polarity, phase, Mode
+	 * 0x00: Mode 0: Data are captured on the clock rising edge and
+	 * 			data is output on a falling edge. Base level of clock is 0.
+	 * 			(CPOL=0, CPHA=0).
+	 * 0x03: Mode 3: Data are captured on the clock falling edge and
+	 * 			data is output on a rising edge. Base level of clock is 1.
+	 * 			(CPOL=1, CPHA=1).
+	 * */
+	u8_t mode:2;
+
+	/* Defines how many lines will be used for read/write operation
+	 * 0x00: One data line
+	 * 0x01: Two data lines
+	 * 0x02: Four data lines
+	 *  */
+	u8_t data_lines:2;
+
+	/* Defines how many bits are used for address (8/16/24/32)
+	 * 0x00: 8 bit address field
+	 * 0x01: 16 bit address field
+	 * 0x02: 24 bit address field
+	 * 0x03: 32 bit address field
+	 * */
+	u8_t address:2;
 
 	/* Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands. */
 	u8_t cs_high_time;
-
-	/* Defines how many lines will be used for read/write operation */
-	u8_t data_lines:2;
-
-	/* Defines how many bits are used for address (8/16/24/32) */
-	u8_t address:2;
 };
 
 
-/**
- * @brief QSPI buffer structure
- *
- * @param buf is a valid pointer on a data buffer, or NULL otherwise.
- * @param len is the length of the buffer or, if buf is NULL, will be the
- *    length which as to be sent as dummy bytes (as TX buffer) or
- *    the length of bytes that should be skipped (as RX buffer).
- */
-struct qspi_buf {
-	u8_t *buf;
-	size_t len;
-};
+
 
 
 /**
@@ -167,275 +141,94 @@ struct qspi_driver_api {
 
 };
 
-//-----------------------------------------		ERROR CODES
-/*
- * qspi_api_config
- *	ENXIO No such device or address
- *	EBUSY device busy
- *	ECANCELED - operation cancelled (becoise peripherial has been initialised so far)
- *
- */
-
-/*
- * qspi_api_write
- * 	ENXIO 		- No such device or address
- * 	EINVAL 		- invalid input parameter
- * 	EBUSY 		- device busy
- * 	ETIMEDOUT	- timeout
- */
-
-/*
- * qspi_api_read
- * 	ENXIO 		- No such device or address
- * 	EINVAL 		- invalid input parameter
- * 	EBUSY 		- device busy
- * 	ETIMEDOUT	- timeout
- */
-
-/*
- * qspi_api_erase
- * 	ENXIO 		- No such device
- * 	EINVAL 		- invalid input parameter
- * 	EBUSY 		- device busy
- * 	ETIMEDOUT	- timeout
- */
-
-/*
- * qspi_api_cmd_xfer
- * 	ENXIO 		- No such device
- * 	EINVAL 		- invalid input parameter
- * 	EBUSY 		- device busy
- * 	ETIMEDOUT	- timeout
- */
 
 /**
- * @brief Sends custom command.
+ * @brief Writes desired amount of data to he external flash memory.
  *
  * Note: This function is synchronous.
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param config Pointer to a valid qspi_config structure instance.
- * @param tx_buf Buffer where data to be sent originates from,
- *        or NULL if none.
- * @param tx_len Amount of data to be transmitted from tx_buf. Value in bytes,
- *        or 0 if none.
+ * @param tx_buf Buffer for tx purpose. Consists of the fields:
+ * 			*buf	- pointer to the buffer
+ * 			len		- amount of data to be transfered
  *
- * @param rx_bufs Buffer where data to be read will be written to,
- *        or NULL if none.
- * @param rx_len Amount of data to be received to rx_buf. Value in bytes,
- *        or 0 if none.
+ * @param address	-  Addres where the data will be written.
  *
- * @param op_code Operation code to be sent. It is defined in the flash manufacture's datasheet. One byte value,
- *        or 0 if none.
- *
- * @param address Addres where the operation will take place (i.e erase). Four byte value,
- *        or (-1) if none.
- *
- * @retval 0 If successful, negative errno code otherwise. In case of slave
- *         transaction: if successful it will return the amount of frames
- *         received, negative errno code otherwise.
+ * @retval  0 in case of success
+ * 			ENXIO 		- No such device or address
+ * 			EINVAL 		- invalid input parameter
+ * 			EBUSY 		- device busy
+ * 			ETIMEDOUT	- timeout
  */
-__syscall int qspi_cmd_xfer(struct device *dev,
-					const struct qspi_config *config,
-					const void *tx_buf,
-					size_t tx_len,
-					const void *rx_buf,
-					size_t rx_len,
-					u32_t op_code,
-					u32_t address);
+__syscall int qspi_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address);
 
-static inline	//--------------- IN DEVELOPMENT int z_impl_qspi_cmd_xfer(struct device *dev,
-					const struct qspi_config *config,
-					const void *tx_buf,
-					size_t tx_len,
-					const void *rx_buf,
-					size_t rx_len,
-					u32_t op_code,
-					u32_t address)
+static inline int z_impl_qspi_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->cmd_xfer(dev, config, tx_buf, tx_len, rx_buf, rx_len, op_code, address);
+	return api->write(dev, tx_buf, address);
 }
 
+
 /**
- * @brief Read the specified amount of data from the QSPI driver.
+ * @brief Read desired amount of data to the external flash memory.
  *
  * Note: This function is synchronous.
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param config Pointer to a valid qspi_config structure instance.
- * @param rx_bufs Amount of data to be received to rx_buf.
- * @param len Amount of data to be received to rx_buf.
- * @param address Addres where the operation will take place (i.e erase). Four byte value,
- *        or (-1) if none.
+ * @param rx_buf Buffer for rx purpose. Consists of the fields:
+ * 			*buf	- pointer to the buffer
+ * 			len		- amount of data to be transfered
  *
- * @retval 0 	//--------------- IN DEVELOPMENTIf successful, negative errno code otherwise.
+ * @param address	-  Addres from the data will be read.
  *
- * @note This function is an helper function calling qspi_transceive.
+ * @retval  0 in case of success
+ * 			ENXIO 		- No such device or address
+ * 			EINVAL 		- invalid input parameter
+ * 			EBUSY 		- device busy
+ * 			ETIMEDOUT	- timeout
  */
-__syscall int qspi_read(struct device *dev,
-				const struct qspi_config *config,
-				const void * rx_buf,
-				size_t len,
-				uint32_t address);
+__syscall int qspi_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address);
 
-static inline int z_impl_qspi_read(struct device *dev,
-				const struct qspi_config *config,
-				const void * rx_buf,
-				size_t len,
-				uint32_t address)
+static inline int z_impl_qspi_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->read(dev, config, rx_buf, len, address);
+	return api->read(dev, rx_buf, address);
 }
 
-//--------------- IN DEVELOPMENT
-/**
- * @brief Write the specified amount of data from the QSPI driver.
- *
- * Note: This function is synchronous.
- *
- * @param dev Pointer to the device structure for the driver instance
- * @param config Pointer to a valid qspi_config structure instance.
- * @param tx_buf Buffer where data to be sent originates from.
- * @param address Address where the data will be written. Four byte value,
- *        or (-1) if none.
- *
- * @retval 0 If successful, negative errno code otherwise.
- *
- * @note This function is an helper function calling qspi_transceive.
- */
-__syscall int qspi_write(struct device *dev,
-				const struct qspi_config *config,
-				const void * tx_buf,
-				size_t len,
-				uint32_t address);
+__syscall int qspi_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const struct qspi_buf *rx_buf);
 
-static inline int z_impl_qspi_write(struct device *dev,
-				const struct qspi_config *config,
-				const void * tx_buf,
-				size_t len,
-				uint32_t address)
+static inline int z_impl_qspi_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const struct qspi_buf *rx_buf)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->write(dev, config, tx_buf, len, address);
+	return api->send_cmd(dev, tx_buf, rx_buf);
 }
 
+__syscall int qspi_erase(struct device *dev, u32_t start_address, u32_t length);
 
-#ifdef CONFIG_QSPI_ASYNC
-/**
- * @brief Read/write the specified amount of data from the QSPI driver.
- *
- * Note: This function is asynchronous.
- *
- * @param dev Pointer to the device structure for the driver instance
- * @param config Pointer to a valid qspi_config structure instance.
- * @param tx_bufs Buffer array where data to be sent originates from,
- *        or NULL if none.
- * @param rx_bufs Buffer array where data to be read will be written to,
- *        or NULL if none.
- * @param async A pointer to a valid and ready to be signaled
- *        struct k_poll_signal. (Note: if NULL this function will not
- *        notify the end of the transaction, and whether it went
- *        successfully or not).
- *
- * @retval 0 If successful, negative errno code otherwise. In case of slave
- *         transaction: if successful it will return the amount of frames
- *         received, negative errno code otherwise.
- */
-static inline int qspi_transceive_async(struct device *dev,
-				       const struct qspi_config *config,
-				       const struct qspi_buf_set *tx_bufs,
-				       const struct qspi_buf_set *rx_bufs,
-				       struct k_poll_signal *async)
+static inline int z_impl_qspi_erase(struct device *dev, u32_t start_address, u32_t length)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->transceive_async(dev, config, tx_bufs, rx_bufs, async);
+	return api->erase(dev, start_address, length);
 }
 
-/**
- * @brief Read the specified amount of data from the QSPI driver.
- *
- * Note: This function is asynchronous.
- *
- * @param dev Pointer to the device structure for the driver instance
- * @param config Pointer to a valid qspi_config structure instance.
- * @param rx_bufs Buffer array where data to be read will be written to.
- * @param async A pointer to a valid and ready to be signaled
- *        struct k_poll_signal. (Note: if NULL this function will not
- *        notify the end of the transaction, and whether it went
- *        successfully or not).
- *
- * @retval 0 If successful, negative errno code otherwise.
- *
- * @note This function is an helper function calling qspi_transceive_async.
- */
-static inline int qspi_read_async(struct device *dev,
-				 const struct qspi_config *config,
-				 const struct qspi_buf_set *rx_bufs,
-				 struct k_poll_signal *async)
-{
-	return qspi_transceive_async(dev, config, NULL, rx_bufs, async);
-}
+__syscall int qspi_set_act_mem(struct device *dev, const struct qspi_config *config);
 
-/**
- * @brief Write the specified amount of data from the QSPI driver.
- *
- * Note: This function is asynchronous.
- *
- * @param dev Pointer to the device structure for the driver instance
- * @param config Pointer to a valid qspi_config structure instance.
- * @param tx_bufs Buffer array where data to be sent originates from.
- * @param async A pointer to a valid and ready to be signaled
- *        struct k_poll_signal. (Note: if NULL this function will not
- *        notify the end of the transaction, and whether it went
- *        successfully or not).
- *
- * @retval 0 If successful, negative errno code otherwise.
- *
- * @note This function is an helper function calling qspi_transceive_async.
- */
-static inline int qspi_write_async(struct device *dev,
-				  const struct qspi_config *config,
-				  const struct qspi_buf_set *tx_bufs,
-				  struct k_poll_signal *async)
-{
-	return qspi_transceive_async(dev, config, tx_bufs, NULL, async);
-}
-#endif /* CONFIG_QSPI_ASYNC */
-
-/**
- * @brief Release the QSPI device locked on by the current config
- *
- * Note: This synchronous function is used to release the lock on the QSPI
- *       device that was kept if, and if only, given config parameter was
- *       the last one to be used (in any of the above functions) and if
- *       it has the QSPI_LOCK_ON bit set into its operation bits field.
- *       This can be used if the caller needs to keep its hand on the QSPI
- *       device for consecutive transactions.
- *
- * @param dev Pointer to the device structure for the driver instance
- * @param config Pointer to a valid qspi_config structure instance.
- */
-__syscall int qspi_release(struct device *dev,
-			  const struct qspi_config *config);
-
-static inline int z_impl_qspi_release(struct device *dev,
-				    const struct qspi_config *config)
+static inline int z_impl_qspi_set_act_mem(struct device *dev, const struct qspi_config *config)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->release(dev, config);
+	return api->set_act_mem(dev, config);
 }
+
 
 #ifdef __cplusplus
 }

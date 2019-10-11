@@ -221,16 +221,14 @@ arduino_spi: &spi3 {
 	io00-pin = <20>;
 	io01-pin = <21>;
 	io02-pin = <22>;
-	io03-pin = <23>;
-	max-frequency = <80000000>;
-	mem1: mem1@11 {
+	io03-pin = <23>; 
+	max-frequency = <32000000>;
+	mem1: mem1@0 {
 		compatible = "jedec,qspi-nor";
-		reg = <17>;
-		wp-gpios = <&gpio0 22 0>;
-		hold-gpios = <&gpio0 23 0>;
-		reset-gpios = <&gpio0 24 0>;
+		reg = <0>; 
+		cs-pin = <17>;
 		frequency = <16000000>;
-		spi-mode = <3>;
+		qspi-mode = <3>;
 		data-lines = <4>;
 		address-size = <24>;
 		cs-high-time = <1>;
