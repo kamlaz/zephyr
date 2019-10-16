@@ -43,12 +43,12 @@ enum{
 uint8_t chip_mem[TEST_MAX_MEM]={0};	// Holds data read from FLASH memory
 uint8_t test[TEST_MAX_MEM]={0};		// Holds data that will be sent to FLASH memory
 
+struct qspi_buf txBuff;
 struct device *qspi;				// Defines pointer to qspi device
 struct qspi_config qspi_cfg;		// Config for qspi device
 
 /* Private function prototypes -----------------------------------------------*/
 static void qspi_configure(struct qspi_config * pCfg);
-//static void qspi_configure(void);
 //void qspi_init(uint32_t frequency, uint8_t addressMode, uint8_t dataLines);
 
 /* TESTING FUNCTIONS */
@@ -74,15 +74,18 @@ void main(void)
 		LOG_INF("QSPI: Device driver found.");
 	}
 
-
-
-
-
 	/* Assign config */
 	qspi_configure(&qspi_cfg);
-//	qspi_configure();
-//	qspi_init(8000000,QSPI_ADDRESS_MODE_24BIT, QSPI_DATA_LINES_QUAD);
-//
+
+	/* Set configuration of the driver */
+	qspi_set_act_mem(qspi, &qspi_cfg);
+
+	u8_t txbuffer[8]={1,2,3,4,1,2,3,4};
+	struct qspi_buf txBuff = {
+			.buf = txbuffer,
+			.len = sizeof(txbuffer)
+	};
+	qspi_write(qspi, &txBuff, 0);
 //	/* Identify the flash */
 //	LOG_INF("Vendor ID: %x", read_device_id());
 //
@@ -107,17 +110,15 @@ void main(void)
 // * @retval None
 // */
 static void qspi_configure(struct qspi_config * pCfg){
+	pCfg->cs_pin = DT_NORDIC_NRF_QSPI_40029000_JEDEC_QSPI_NOR_0_CS_PIN;
 	pCfg->frequency = 8000000;
-	pCfg->operation = (	QSPI_CS_DELAY_SET(8) 							|
-						QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)		|
-						QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
+	pCfg->data_lines = QSPI_DATA_LINES_SINGLE;
+	pCfg->address = QSPI_ADDRESS_MODE_24BIT;
+	pCfg->cs_high_time = 0;
+	pCfg->mode = QSPI_MODE_0;
+
 }
-//static void qspi_configure(void){
-//	qspi_cfg.frequency = 8000000;
-//	qspi_cfg.operation = (	QSPI_CS_DELAY_SET(8) 							|
-//						QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)			|
-//						QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
-//}
+
 ////---------------------------------------------------------------------------		TEST FUNCTIONS
 //
 ///**
