@@ -12,46 +12,18 @@
 LOG_MODULE_REGISTER(qspi_nrfx_qspi);
 /* Private define ------------------------------------------------------------*/
 /* Page, sector, and block size are standard, not configurable. */
+
+#define QSPI_DATA_LINES_FIELD_SIZE	0x03
+#define QSPI_DATA_LINES_GET(_operation_)					\
+	(((_operation_) & QSPI_DATA_LINES_FIELD_SIZE))
+
+#define QSPI_ADDRESS_FIELD_SIZE	0x03
+#define QSPI_ADDRESS_GET(_operation_)					\
+	(((_operation_) & QSPI_ADDRESS_FIELD_SIZE))
+
 /**
  * @brief QSPI Polarity & Phase Modes
  */
-
-/**
- * Clock Polarity: if set, clock idle state will be 1
- * and active state will be 0. If untouched, the inverse will be true
- * which is the default.
- */
-#define QSPI_MODE_CPOL					BIT(0)
-
-/**
- * Clock Phase: this dictates when is the data captured, and depends
- * clock's polarity. When QSPI_MODE_CPOL is set and this bit as well,
- * capture will occur on low to high transition and high to low if
- * this bit is not set (default). This is fully reversed if CPOL is
- * not set.
- */
-#define QSPI_MODE_CPHA					BIT(1)
-
-
-///**
-// * No of data lines that are used for the transfer
-// */
-//#define QSPI_DATA_LINES_SINGLE			0x00
-//#define QSPI_DATA_LINES_DOUBLE			0x01
-//#define QSPI_DATA_LINES_QUAD			0x02
-//
-///**
-// * @brief QSPI Address configuration
-// * Length of the address field. Typical flash chips support 24bit address mode
-// * 0x00	-	8 bit address
-// * 0x01	-	16 bit address
-// * 0x02	-	24 bit address
-// * 0x03	-	32 bit address
-// */
-//#define QSPI_ADDRESS_MODE_8BIT			0x00
-//#define QSPI_ADDRESS_MODE_16BIT			0x01
-//#define QSPI_ADDRESS_MODE_24BIT			0x02
-//#define QSPI_ADDRESS_MODE_32BIT			0x03
 
 #define QSPI_NOR_PAGE_SIZE    			0x0100U
 #define QSPI_NOR_SECTOR_SIZE  			0x1000U
@@ -77,20 +49,23 @@ static const struct qspi_nrfx_config qspi_conf;
 int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address);
 int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address);
 int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const struct qspi_buf *rx_buf);
-int qspi_nrfx_erase(struct device *dev, u32_t start_address, u32_t length);
+int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size);
 int qspi_nrfx_set_act_mem(struct device *dev, const struct qspi_config *config);
 
-static inline void qspi_fill_init_struct(const struct qspi_config * config,nrfx_qspi_config_t * configStruct);
+static inline void qspi_fill_init_struct(const struct qspi_config * config,nrfx_qspi_config_t * initStruct);
 static inline int get_nrf_qspi_readoc(u8_t data_lines);
 static inline int get_nrf_qspi_wrieoc(u8_t data_lines);
 static inline int get_nrf_qspi_address_mode(u8_t address);
 static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency);
 
-
-
-
-
-
+/* API definition */
+static const struct qspi_driver_api qspi_nrfx_driver_api = {
+	.write = qspi_nrfx_write,
+	.read = qspi_nrfx_read,
+	.send_cmd = qspi_nrfx_send_cmd,
+	.erase = qspi_nrfx_erase,
+	.set_act_mem = qspi_nrfx_set_act_mem,
+};
 
 
 
@@ -104,13 +79,13 @@ static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency);
  */
 static inline int get_nrf_qspi_readoc(u8_t data_lines)
 {
-	if (data_lines & (1<<0)) {			/**< SINGLE line operation. QSPI_DATA_LINES_SINGLE*/
+	if (QSPI_DATA_LINES_GET(data_lines) == QSPI_DATA_LINES_SINGLE) {			/**< SINGLE line operation. QSPI_DATA_LINES_SINGLE*/
 		return NRF_QSPI_READOC_FASTREAD;
 	}
-	else if (data_lines & (1<<0)){		/**< DOUBLE line operation. QSPI_DATA_LINES_DOUBLE*/
+	else if (QSPI_DATA_LINES_GET(data_lines) == QSPI_DATA_LINES_DOUBLE){		/**< DOUBLE line operation. QSPI_DATA_LINES_DOUBLE*/
 		return NRF_QSPI_READOC_READ2IO;
 	}
-	else if (data_lines & (1<<1)){		/**< QUAD line operation. QSPI_DATA_LINES_QUAD*/
+	else if (QSPI_DATA_LINES_GET(data_lines) == QSPI_DATA_LINES_QUAD){		/**< QUAD line operation. QSPI_DATA_LINES_QUAD*/
 		return NRF_QSPI_READOC_READ4IO;
 	}
 	else{
@@ -129,13 +104,13 @@ static inline int get_nrf_qspi_readoc(u8_t data_lines)
  */
 static inline int get_nrf_qspi_wrieoc(u8_t data_lines)
 {
-	if (data_lines == QSPI_DATA_LINES_SINGLE) {			/**< SINGLE line operation. */
+	if (QSPI_DATA_LINES_GET(data_lines) == QSPI_DATA_LINES_SINGLE) {			/**< SINGLE line operation. */
 		return NRF_QSPI_WRITEOC_PP;
 	}
-	else if (data_lines == QSPI_DATA_LINES_DOUBLE){		/**< DOUBLE line operation. */
+	else if (QSPI_DATA_LINES_GET(data_lines) == QSPI_DATA_LINES_DOUBLE){		/**< DOUBLE line operation. */
 		return NRF_QSPI_WRITEOC_PP2O;
 	}
-	else if (data_lines == QSPI_DATA_LINES_QUAD){		/**< QUAD line operation. */
+	else if (QSPI_DATA_LINES_GET(data_lines) == QSPI_DATA_LINES_QUAD){		/**< QUAD line operation. */
 		return NRF_QSPI_WRITEOC_PP4IO;
 	}
 	else{
@@ -154,10 +129,10 @@ static inline int get_nrf_qspi_wrieoc(u8_t data_lines)
  */
 static inline int get_nrf_qspi_address_mode(u8_t address)
 {
-	if (address == QSPI_ADDRESS_MODE_24BIT) {		/**< 24 BIT ADDR. */
+	if (QSPI_ADDRESS_GET(address) == QSPI_ADDRESS_MODE_24BIT) {		/**< 24 BIT ADDR. */
 		return NRF_QSPI_ADDRMODE_24BIT;
 	}
-	else if (address == QSPI_ADDRESS_MODE_32BIT){	/**< 32 BIT ADDR. */
+	else if (QSPI_ADDRESS_GET(address) == QSPI_ADDRESS_MODE_32BIT){	/**< 32 BIT ADDR. */
 		return NRF_QSPI_ADDRMODE_32BIT;
 	}
 	else{
@@ -214,14 +189,7 @@ static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency)
 }
 
 
-/* API definition */
-static const struct qspi_driver_api qspi_nrfx_driver_api = {
-	.write = qspi_nrfx_write,
-	.read = qspi_nrfx_read,
-	.send_cmd = qspi_nrfx_send_cmd,
-	.erase = qspi_nrfx_erase,
-	.set_act_mem = qspi_nrfx_set_act_mem,
-};
+
 
 /**
  * @brief QSPI handler
@@ -242,7 +210,6 @@ static void qspi_handler(nrfx_qspi_evt_t event, void * p_context)
 }
 
 int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address){
-	//__ASSERT(tx_buf, "Tx buffer cannot be null!");
 	/* Check input parameters */
 	if (!dev) 		{ return -ENXIO;}
 	if (!tx_buf)	{ return -EINVAL;}
@@ -269,95 +236,99 @@ int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const 
 	return 0;
 }
 
-int qspi_nrfx_erase(struct device *dev, u32_t start_address, u32_t length){
+int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size){
 	/* Check input parameters */
-//	if (!dev) 		{ return -ENXIO;}
-//
-//	int result = 0;
-//
-//	while (length) {
-//		if (size == params->size) {		// TODO: investigate
-////			/* chip erase */
-//			result = nrfx_qspi_chip_erase();
-////			size -= params->size;
-//		} else if ((size >= QSPI_NOR_BLOCK_SIZE)
-//				&& QSPI_NOR_IS_BLOCK_ALIGNED(addr)) {
-//			/* 64 KiB block erase */
-//			nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_64KB,start_address);
-//
-//			addr += QSPI_NOR_BLOCK_SIZE;
-//			size -= QSPI_NOR_BLOCK_SIZE;
+	if (!dev) 		{ return -ENXIO;}
+
+	int result = 0;
+
+	while (size) {
+		if (size == 0xFFFFFFFF) {		// TODO: investigate
+//			/* chip erase */
+			result = nrfx_qspi_chip_erase();
+			size -= 0xFFFFFFFF;
+		} else if ((size >= QSPI_NOR_BLOCK_SIZE)
+				&& QSPI_NOR_IS_BLOCK_ALIGNED(addr)) {
+			/* 64 KiB block erase */
+			nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_64KB,addr);
+
+			addr += QSPI_NOR_BLOCK_SIZE;
+			size -= QSPI_NOR_BLOCK_SIZE;
 //		} else if ((size >= QSPI_NOR_BLOCK32_SIZE)
 //				&& QSPI_NOR_IS_BLOCK32_ALIGNED(addr)) {
 //			/* 32 KiB block erase */
 //			// TODO: ADD FUCTION HERE
 //			addr += QSPI_NOR_BLOCK32_SIZE;
 //			size -= QSPI_NOR_BLOCK32_SIZE;
-//		} else if ((size >= QSPI_NOR_SECTOR_SIZE)
-//				&& QSPI_NOR_IS_SECTOR_ALIGNED(addr)) {
-//			/* sector erase */
-//			nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_4KB,start_address);
-//			addr += QSPI_NOR_SECTOR_SIZE;
-//			size -= QSPI_NOR_SECTOR_SIZE;
-//		} else {
-//			/* minimal erase size is at least a sector size */
+		} else if ((size >= QSPI_NOR_SECTOR_SIZE)
+				&& QSPI_NOR_IS_SECTOR_ALIGNED(addr)) {
+			/* sector erase */
+			nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_4KB,addr);
+			addr += QSPI_NOR_SECTOR_SIZE;
+			size -= QSPI_NOR_SECTOR_SIZE;
+		} else {
+			/* minimal erase size is at least a sector size */
 //			SYNC_UNLOCK();
-//			LOG_DBG("unsupported at 0x%lx size %zu", (long)addr,
-//					size);
-//			return -EINVAL;
-//		}
-//	}
-	return 0;
-}
-
-/* Configures QSPI memory for the transfer */
-int qspi_nrfx_set_act_mem(struct device *dev, const struct qspi_config *config){
-	int rescode = 0;
-//	static const struct qspi_nrfx_config qspi_data;
-	nrfx_qspi_config_t QSPIconfig;
-	qspi_fill_init_struct(config, &QSPIconfig);
-	rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
-	if(rescode != 0){
-		if(rescode == NRFX_ERROR_TIMEOUT){
-			return -ETIMEDOUT;
-		}
-		else if(rescode == NRFX_ERROR_INVALID_STATE){
-			return ECANCELED;
-		}
-		else{
+			LOG_DBG("unsupported at 0x%lx size %zu", (long)addr,
+					size);
 			return -EINVAL;
 		}
 	}
 	return 0;
 }
 
-static inline void qspi_fill_init_struct(const struct qspi_config * config,nrfx_qspi_config_t * configStruct){
+/* Configures QSPI memory for the transfer */
+int qspi_nrfx_set_act_mem(struct device *dev, const struct qspi_config *config){
+	int rescode = 0;
+	static nrfx_qspi_config_t QSPIconfig;
+	qspi_fill_init_struct(config, &QSPIconfig);
+	rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
+	if (rescode != 0) {
+		if (rescode == NRFX_ERROR_TIMEOUT) {
+			return -ETIMEDOUT;
+		} else if (rescode == NRFX_ERROR_INVALID_STATE) {
+			return ECANCELED;
+		} else {
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+/**
+ * @brief Fills inits struct
+ * Amount of lines used for transfer
+ *
+ * @param config 		- Config struct
+ * @param configStruct	-
+ * @retval None
+ */
+static inline void qspi_fill_init_struct(const struct qspi_config * config,nrfx_qspi_config_t * initStruct){
 /* Configure XIP offset */
-	configStruct->xip_offset  = NRFX_QSPI_CONFIG_XIP_OFFSET;
+	initStruct->xip_offset  = NRFX_QSPI_CONFIG_XIP_OFFSET;
 
 	/* Configure pins */
-	configStruct->pins.sck_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_SCK_PIN;
-	configStruct->pins.csn_pin  = config->cs_pin;
-	configStruct->pins.io0_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_IO00_PIN;
-	configStruct->pins.io1_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_IO01_PIN;
-	configStruct->pins.io2_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_IO02_PIN;
-	configStruct->pins.io3_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_IO03_PIN;
+	initStruct->pins.sck_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_SCK_PIN;
+	initStruct->pins.csn_pin  = config->cs_pin;
+	initStruct->pins.io0_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_IO00_PIN;
+	initStruct->pins.io1_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_IO01_PIN;
+	initStruct->pins.io2_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_IO02_PIN;
+	initStruct->pins.io3_pin  = DT_NORDIC_NRF_QSPI_QSPI_0_IO03_PIN;
 
 	/* Configure IRQ priority */
-	configStruct->irq_priority   = (uint8_t)NRFX_QSPI_CONFIG_IRQ_PRIORITY;
+	initStruct->irq_priority   = (uint8_t)NRFX_QSPI_CONFIG_IRQ_PRIORITY;
 
 	/* Configure Protocol interface */
-	configStruct->prot_if.readoc     = (nrf_qspi_readoc_t)get_nrf_qspi_readoc(config->data_lines);
-	configStruct->prot_if.writeoc    = (nrf_qspi_writeoc_t)get_nrf_qspi_wrieoc(config->data_lines);
-	configStruct->prot_if.addrmode   = (nrf_qspi_addrmode_t)get_nrf_qspi_address_mode(config->address);
-	configStruct->prot_if.dpmconfig  = false;
+	initStruct->prot_if.readoc     = (nrf_qspi_readoc_t)get_nrf_qspi_readoc(config->data_lines);
+	initStruct->prot_if.writeoc    = (nrf_qspi_writeoc_t)get_nrf_qspi_wrieoc(config->data_lines);
+	initStruct->prot_if.addrmode   = (nrf_qspi_addrmode_t)get_nrf_qspi_address_mode(config->address);
+	initStruct->prot_if.dpmconfig  = false;
 
 	/* COnfigure physical interface */
-	configStruct->phy_if.sck_freq   = (nrf_qspi_frequency_t)get_nrf_qspi_prescaler(config->frequency);
-	configStruct->phy_if.sck_delay  = (uint8_t)config->cs_high_time;
-	configStruct->phy_if.spi_mode   = (nrf_qspi_spi_mode_t)config->mode;
-	configStruct->phy_if.dpmen      = false;
-
+	initStruct->phy_if.sck_freq   = (nrf_qspi_frequency_t)get_nrf_qspi_prescaler(config->frequency);
+	initStruct->phy_if.sck_delay  = (uint8_t)config->cs_high_time;
+	initStruct->phy_if.spi_mode   = (nrf_qspi_spi_mode_t)config->mode;
+	initStruct->phy_if.dpmen      = false;
 }
 
 /* Function for QSPI Power Management handling */
@@ -365,33 +336,6 @@ static int qspi_nrfx_pm_control(void)
 {
 	return 0;
 }
-
-//static const struct qspi_nrfx_config qspi_data;// = {
-//		.config = {
-//			.xip_offset  = NRFX_QSPI_CONFIG_XIP_OFFSET,
-//			.pins = {
-//			   .sck_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_SCK_PIN,
-//			   .csn_pin     = 0,
-//			   .io0_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO00_PIN,
-//			   .io1_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO01_PIN,
-//			   .io2_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO02_PIN,
-//			   .io3_pin     = DT_NORDIC_NRF_QSPI_QSPI_0_IO03_PIN,
-//			},
-//			.irq_priority   = (uint8_t)NRFX_QSPI_CONFIG_IRQ_PRIORITY,
-//			.prot_if = {
-//				.readoc     = (nrf_qspi_readoc_t)NRFX_QSPI_CONFIG_READOC,
-//				.writeoc    = (nrf_qspi_writeoc_t)NRFX_QSPI_CONFIG_WRITEOC,
-//				.addrmode   = (nrf_qspi_addrmode_t)NRF_QSPI_ADDRMODE_24BIT,
-//				.dpmconfig  = false,
-//			},
-//			.phy_if = {
-//				.sck_freq   = (nrf_qspi_frequency_t)NRFX_QSPI_CONFIG_FREQUENCY,
-//				.sck_delay  = (uint8_t)NRFX_QSPI_CONFIG_SCK_DELAY,
-//				.spi_mode   = (nrf_qspi_spi_mode_t)NRFX_QSPI_CONFIG_MODE,
-//				.dpmen      = false
-//			},
-//		}
-//	};
 
 
 /* Structure with basic structure */
