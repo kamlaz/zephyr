@@ -1,4 +1,8 @@
-
+/*
+ * Copyright (c) 2019, Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 /* Includes ------------------------------------------------------------------*/
 #include <sys/__assert.h>
@@ -14,7 +18,7 @@ LOG_MODULE_REGISTER(qspi_nrfx_qspi);
 /* Page, sector, and block size are standard, not configurable. */
 
 #define QSPI_DATA_LINES_FIELD_SIZE	0x03
-#define QSPI_DATA_LINES_GET(_operation_)					\
+#define QSPI_DATA_LINES_GET(_operation_)				\
 	(((_operation_) & QSPI_DATA_LINES_FIELD_SIZE))
 
 #define QSPI_ADDRESS_FIELD_SIZE	0x03
@@ -37,12 +41,17 @@ LOG_MODULE_REGISTER(qspi_nrfx_qspi);
 #define QSPI_NOR_IS_BLOCK32_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_BLOCK32_SIZE - 1U)) == 0)
 /* Imported variables --------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+/* Structure with basic structure */
+struct qspi_nrfx_data {
+	struct k_sem xfer;
+	u8_t   busy;
+};
+
 /* Main config structure */
 struct qspi_nrfx_config {
 	nrfx_qspi_config_t config;
 };
 static const struct qspi_nrfx_config qspi_conf;
-struct k_sem qspi_sem;
 
 
 /* Exported types ------------------------------------------------------------*/
@@ -67,7 +76,10 @@ static const struct qspi_driver_api qspi_nrfx_driver_api = {
 	.set_act_mem = qspi_nrfx_set_act_mem,
 };
 
-
+static inline struct qspi_nrfx_data *get_dev_data(struct device *dev)
+{
+	return dev->driver_data;
+}
 
 /**
  * @brief Get QSPI read operation code
@@ -201,12 +213,13 @@ static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency)
  */
 static void qspi_handler(nrfx_qspi_evt_t event, void * p_context)
 {
-//	struct device *dev = p_context;
-//	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+	struct device *dev = p_context;
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
 
 	if (event == NRFX_QSPI_EVENT_DONE) {
 	/* Add functionality */
 	}
+	k_sem_give(&dev_data->xfer);
 }
 
 int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address){
@@ -214,6 +227,7 @@ int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t add
 	if (!dev) 		{ return -ENXIO;}
 	if (!tx_buf)	{ return -EINVAL;}
 
+	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
 	int result = 0;
 	return nrfx_qspi_write(tx_buf->buf, tx_buf->len, address);
 }
@@ -222,6 +236,7 @@ int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t addr
 	/* Check input parameters */
 	if (!dev) 		{ return -ENXIO;}
 	if (!rx_buf)	{ return -EINVAL;}
+	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
 
 	int result = 0;
 	return nrfx_qspi_read(rx_buf->buf, rx_buf->len, address);
@@ -231,6 +246,7 @@ int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const 
 	/* Check input parameters */
 	if (!dev) 		{ return -ENXIO;}
 	if (!rx_buf)	{ return -EINVAL;}
+	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
 
 	int result = 0;
 	return 0;
@@ -240,6 +256,7 @@ int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size){
 	/* Check input parameters */
 	if (!dev) 		{ return -ENXIO;}
 
+	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
 	int result = 0;
 
 	while (size) {
@@ -280,6 +297,10 @@ int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size){
 /* Configures QSPI memory for the transfer */
 int qspi_nrfx_set_act_mem(struct device *dev, const struct qspi_config *config){
 	int rescode = 0;
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+
+	k_sem_init(&((struct qspi_nrfx_data *)dev->driver_data)->xfer, 1, UINT_MAX);
+
 	static nrfx_qspi_config_t QSPIconfig;
 	qspi_fill_init_struct(config, &QSPIconfig);
 	rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
@@ -338,12 +359,6 @@ static int qspi_nrfx_pm_control(void)
 }
 
 
-/* Structure with basic structure */
-struct qspi_nrfx_data {
-	u8_t   busy;
-};
-
-
 
 #define QSPI_NRFX_QSPI_DEVICE(void)					       						\
 	static int qspi_init(struct device *dev)			       					\
@@ -359,8 +374,8 @@ struct qspi_nrfx_data {
 	DEVICE_DEFINE(qspi, DT_NORDIC_NRF_QSPI_QSPI_0_LABEL,	       				\
 		      qspi_init,					       								\
 		      qspi_nrfx_pm_control,				       							\
-		      NULL,				       									\
-		      NULL,				       									\
+		      &qspi_data,				       											\
+		      NULL,				       											\
 		      POST_KERNEL, CONFIG_QSPI_INIT_PRIORITY,		      	 			\
 		      &qspi_nrfx_driver_api)
 
