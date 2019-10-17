@@ -81,11 +81,21 @@ void main(void)
 	qspi_set_act_mem(qspi, &qspi_cfg);
 
 	u8_t txbuffer[8]={1,2,3,4,1,2,3,4};
+	u8_t rxbuffer[8]={0};
 	struct qspi_buf txBuff = {
 			.buf = txbuffer,
 			.len = sizeof(txbuffer)
 	};
+
+	struct qspi_buf rxBuff = {
+			.buf = rxbuffer,
+			.len = sizeof(rxbuffer)
+	};
+
+	qspi_erase(qspi,0,0x1000U);
 	qspi_write(qspi, &txBuff, 0);
+	qspi_read(qspi, &rxBuff, 0);
+	printk("\nCHlosta");
 //	/* Identify the flash */
 //	LOG_INF("Vendor ID: %x", read_device_id());
 //
@@ -116,7 +126,6 @@ static void qspi_configure(struct qspi_config * pCfg){
 	pCfg->address = QSPI_ADDRESS_MODE_24BIT;
 	pCfg->cs_high_time = 0;
 	pCfg->mode = QSPI_MODE_0;
-
 }
 
 ////---------------------------------------------------------------------------		TEST FUNCTIONS
