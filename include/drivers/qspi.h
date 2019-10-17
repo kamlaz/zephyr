@@ -6,16 +6,19 @@
 
 /**
  * @file
- * @brief Public API for QSPI drivers and applications
+ * @brief Public APIs for QSPI drivers and applications
  */
 
 #ifndef ZEPHYR_INCLUDE_DRIVERS_QSPI_H_
 #define ZEPHYR_INCLUDE_DRIVERS_QSPI_H_
 
 /**
- * @brief QSPI Interface
  * @defgroup qspi_interface QSPI Interface
  * @ingroup io_interfaces
+ * @brief QSPI Interface
+ *
+ * The QSPI API provides support for the standard flash
+ * memory devices
  * @{
  */
 
@@ -27,27 +30,33 @@
 extern "C" {
 #endif
 
+/*
+ * The following #defines are used to configure the QSPI controller.
+ */
+
 /**
- * No of data lines that are used for the transfer
+ * No of data lines that are used for the transfer. Some flash memories
+ * supports one, two or four lines.
  */
 #define QSPI_DATA_LINES_SINGLE			0x00
 #define QSPI_DATA_LINES_DOUBLE			0x01
 #define QSPI_DATA_LINES_QUAD			0x02
 
 /**
- * No of data lines that are used for the transfer
+ * SPI mode of the transmission
+ * Mode 0: Data are captured on the clock rising edge and
+ * 			data is output on a falling edge. Base level of clock is 0.
+ * 			(CPOL=0, CPHA=0).
+ * Mode 3: Data are captured on the clock falling edge and
+ * 			data is output on a rising edge. Base level of clock is 1.
+ * 			(CPOL=1, CPHA=1).
  */
-#define QSPI_MODE_0			0x00
-#define QSPI_MODE_3			0x03
-
+#define QSPI_MODE_0						0x00
+#define QSPI_MODE_3						0x03
 
 /**
  * @brief QSPI Address configuration
- * Length of the address field. Typical flash chips support 24bit address mode
- * 0x00	-	8 bit address
- * 0x01	-	16 bit address
- * 0x02	-	24 bit address
- * 0x03	-	32 bit address
+ * Length of the address field in bits. Typical flash chips support 24bit address mode
  */
 #define QSPI_ADDRESS_MODE_8BIT			0x00
 #define QSPI_ADDRESS_MODE_16BIT			0x01
@@ -56,9 +65,10 @@ extern "C" {
 
 /**
  * @brief QSPI buffer structure
+ * Structure used both for TX and RX purposes.
  *
- * @param buf is a valid pointer on a data buffer.
- * @param len is the length of the buffer.
+ * @param buf is a valid pointer to a data buffer.
+ * @param len is the length of the data to be handled.
  */
 struct qspi_buf {
 	u8_t *buf;
@@ -72,7 +82,7 @@ struct qspi_config {
 	 /* Chip Select pin used to select memory */
 	u16_t cs_pin;
 
-	/* Frequency of the QSPI */
+	/* Frequency of the QSPI bus*/
 	u32_t frequency;
 
 	/* Polarity, phase, Mode
@@ -105,9 +115,15 @@ struct qspi_config {
 };
 
 /**
- * @typedef qspi_api_io
+ * @cond INTERNAL_HIDDEN
+ *
+ * These are for internal use only, so skip these in
+ * public documentation.
+ */
+/**
+ * @typedef qspi_api_set_act_mem
  * @brief Callback API for I/O
- * See qspi_transceive() for argument descriptions
+ * See qspi_set_act_mem() for argument descriptions
  */
 typedef int (*qspi_api_set_act_mem)(struct device *dev,
 				const struct qspi_config *config);
@@ -131,7 +147,7 @@ typedef int (*qspi_api_read)(struct device *dev,
 				u32_t address);
 
 /**
- * @typedef qspi_api_xfer
+ * @typedef qspi_api_send_cmd)
  * @brief Callback API for I/O
  * See qspi_transceive() for argument descriptions
  */
@@ -152,8 +168,6 @@ typedef int (*qspi_api_erase)(struct device *dev,
 /**
  * @brief QSPI driver API
  * This is the mandatory API any QSPI driver needs to expose.
- *
- * @param transceive - us
  */
 struct qspi_driver_api {
 	qspi_api_write 			write;
@@ -162,25 +176,28 @@ struct qspi_driver_api {
 	qspi_api_erase 			erase;
 	qspi_api_set_act_mem 	set_act_mem;
 };
+/**
+ * @endcond
+ */
 
 
 /**
- * @brief Writes desired amount of data to he external flash memory.
+ * @brief Writes desired amount of data to the external flash memory.
  *
  * Note: This function is synchronous.
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param tx_buf Buffer for tx purpose. Consists of the fields:
- * 			*buf	- pointer to the buffer
- * 			len		- amount of data to be transfered
+ * @param tx_buf Buffer for transmit purpose. Consists of the fields:
+ * 			*buf pointer to the buffer
+ * 			len	 amount of data to be sent
  *
- * @param address	-  Addres where the data will be written.
+ * @param address Address where the data will be written.
  *
  * @retval  0 in case of success
- * 			ENXIO 		- No such device or address
- * 			EINVAL 		- invalid input parameter
- * 			EBUSY 		- device busy
- * 			ETIMEDOUT	- timeout
+ * @retval	-ENXIO No such device or address
+ * @retval	-EINVAL invalid input parameter
+ * @retval	-EBUSY device busy
+ * @retval	-ETIMEDOUT timeout
  */
 __syscall int qspi_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address);
 
@@ -194,22 +211,22 @@ static inline int z_impl_qspi_write(struct device *dev, const struct qspi_buf *t
 
 
 /**
- * @brief Read desired amount of data to the external flash memory.
+ * @brief Read desired amount of data from the external flash memory.
  *
  * Note: This function is synchronous.
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param rx_buf Buffer for rx purpose. Consists of the fields:
- * 			*buf	- pointer to the buffer
- * 			len		- amount of data to be transfered
+ * @param rx_buf Buffer for receive purpose. Consists of the fields:
+ * 			*buf pointer to the buffer
+ * 			len	 amount of data to be received
  *
- * @param address	-  Addres from the data will be read.
+ * @param address Address from the data will be read.
  *
  * @retval  0 in case of success
- * 			ENXIO 		- No such device or address
- * 			EINVAL 		- invalid input parameter
- * 			EBUSY 		- device busy
- * 			ETIMEDOUT	- timeout
+ * @retval	-ENXIO No such device or address
+ * @retval	-EINVAL invalid input parameter
+ * @retval	-EBUSY device busy
+ * @retval	-ETIMEDOUT timeout
  */
 __syscall int qspi_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address);
 
@@ -223,24 +240,24 @@ static inline int z_impl_qspi_read(struct device *dev, const struct qspi_buf *rx
 
 
 /**
- * @brief Send custom command to the external flash memory.
+ * @brief Function for sending operation code, sending data, and receiving data from the memory device.
  *
  * Note: This function is synchronous.
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param tx_buf Buffer for tx purpose. Consists of the fields:
- * 			*buf	- pointer to the buffer
- * 			len		- amount of data to be transfered
+ * @param tx_buf Buffer for transmit purpose. Consists of the fields:
+ * 			*buf pointer to the buffer
+ * 			len	 amount of data to be sent
  *
- * @param rx_buf Buffer for rx purpose. Consists of the fields:
- * 			*buf	- pointer to the buffer
- * 			len		- amount of data to be transfered
+ * @param rx_buf Buffer for receive purpose. Consists of the fields:
+ * 			*buf pointer to the buffer
+ * 			len	 amount of data to be received
 
  * @retval  0 in case of success
- * 			ENXIO 		- No such device or address
- * 			EINVAL 		- invalid input parameter
- * 			EBUSY 		- device busy
- * 			ETIMEDOUT	- timeout
+ * @retval	-ENXIO No such device or address
+ * @retval	-EINVAL invalid input parameter
+ * @retval	-EBUSY device busy
+ * @retval	-ETIMEDOUT timeout
  */
 __syscall int qspi_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const struct qspi_buf *rx_buf);
 
@@ -253,20 +270,21 @@ static inline int z_impl_qspi_send_cmd(struct device *dev, const struct qspi_buf
 }
 
 /**
- * @brief Erases desired amount of flash memory
+ * @brief Erases desired amount of flash memory - one memory block - 4KB, 64KB, or the whole chip.
  *
  * Note: This function is synchronous.
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param start_address Address, from the erasing will begin
+ * @param start_address Memory address to start erasing.
+ * If chip erase is performed, address field is ommited.
  *
- * @param length number of bytes to erase
+ * @param length Size of data to erase.
 
  * @retval  0 in case of success
- * 			ENXIO 		- No such device or address
- * 			EINVAL 		- invalid input parameter
- * 			EBUSY 		- device busy
- * 			ETIMEDOUT	- timeout
+ * @retval	-ENXIO No such device or address
+ * @retval	-EINVAL invalid input parameter
+ * @retval	-EBUSY device busy
+ * @retval	-ETIMEDOUT timeout
  */
 __syscall int qspi_erase(struct device *dev, u32_t start_address, u32_t length);
 
@@ -280,7 +298,7 @@ static inline int z_impl_qspi_erase(struct device *dev, u32_t start_address, u32
 
 
 /**
- * @brief Configures qspi driver to desired memory
+ * @brief Configures qspi driver to desired memory.
  *
  * Note: This function is synchronous.
  *
@@ -288,10 +306,10 @@ static inline int z_impl_qspi_erase(struct device *dev, u32_t start_address, u32
  * @param config pointer to the configuration structure
  *
  * @retval  0 in case of success
- * 			ENXIO 		- No such device or address
- * 			EINVAL 		- invalid input parameter
- * 			EBUSY 		- device busy
- * 			ETIMEDOUT	- timeout
+ * @retval	-ENXIO No such device or address
+ * @retval	-EINVAL invalid input parameter
+ * @retval	-EBUSY device busy
+ * @retval	-ETIMEDOUT timeout
  */
 __syscall int qspi_set_act_mem(struct device *dev, const struct qspi_config *config);
 
