@@ -42,7 +42,7 @@ struct qspi_nrfx_config {
 	nrfx_qspi_config_t config;
 };
 static const struct qspi_nrfx_config qspi_conf;
-//struct k_sem qspi_sem;
+struct k_sem qspi_sem;
 
 
 /* Exported types ------------------------------------------------------------*/
