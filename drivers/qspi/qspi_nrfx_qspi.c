@@ -45,6 +45,9 @@ LOG_MODULE_REGISTER(qspi_nrfx_qspi);
 struct qspi_nrfx_data {
 	struct k_sem xfer;
 	u8_t   busy;
+#ifdef CONFIG_DEVICE_POWER_MANAGEMENT
+	u32_t pm_state;
+#endif
 };
 
 /* Main config structure */
@@ -59,7 +62,7 @@ int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t add
 int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address);
 int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const struct qspi_buf *rx_buf);
 int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size);
-int qspi_nrfx_set_act_mem(struct device *dev, const struct qspi_config *config);
+int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config);
 
 static inline void qspi_fill_init_struct(const struct qspi_config * config,nrfx_qspi_config_t * initStruct);
 static inline int get_nrf_qspi_readoc(u8_t data_lines);
@@ -73,7 +76,7 @@ static const struct qspi_driver_api qspi_nrfx_driver_api = {
 	.read = qspi_nrfx_read,
 	.send_cmd = qspi_nrfx_send_cmd,
 	.erase = qspi_nrfx_erase,
-	.set_act_mem = qspi_nrfx_set_act_mem,
+	.configure = qspi_nrfx_configure,
 };
 
 static inline struct qspi_nrfx_data *get_dev_data(struct device *dev)
@@ -157,7 +160,7 @@ static inline int get_nrf_qspi_address_mode(u8_t address)
  * @brief Get QSPI prescaler
  * Function returns prescaler for required frequency
  *
- * @param frequency - QSPI config field
+ * @param frequency - QSPI config fieldess Memory address to
  * @retval NRF_SPI_PRESCALER in case of success or
  * 		   -EINVAL in case of failure
  */
@@ -199,9 +202,6 @@ static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency)
 		return NRF_QSPI_FREQ_32MDIV1;	/**<qspi_data 32.0 MHz. */
 	}
 }
-
-
-
 
 /**
  * @brief QSPI handler
@@ -248,8 +248,17 @@ int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const 
 	if (!rx_buf)	{ return -EINVAL;}
 	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
 
-	int result = 0;
-	return 0;
+	nrf_qspi_cinstr_conf_t cinstr_cfg = {
+		.opcode    = tx_buf->buf[0],			// We assign here first element in the buffer, since it is command
+		.length    = tx_buf->len + rx_buf->len,
+		.io2_level = true,
+		.io3_level = true,
+		.wipwait   = true,
+		.wren      = true
+	};
+
+	/* We assigned &tx_buf->buf[1], becouse second element in the array is first byte of our tx buffer */
+	return nrfx_qspi_cinstr_xfer(&cinstr_cfg,&tx_buf->buf[1], rx_buf->buf);
 }
 
 int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size){
@@ -295,12 +304,8 @@ int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size){
 }
 
 /* Configures QSPI memory for the transfer */
-int qspi_nrfx_set_act_mem(struct device *dev, const struct qspi_config *config){
+int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config){
 	int rescode = 0;
-	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
-
-	k_sem_init(&((struct qspi_nrfx_data *)dev->driver_data)->xfer, 1, UINT_MAX);
-
 	static nrfx_qspi_config_t QSPIconfig;
 	qspi_fill_init_struct(config, &QSPIconfig);
 	rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
@@ -369,12 +374,13 @@ static int qspi_nrfx_pm_control(void)
 		return 0;																\
 	}																			\
 	static struct qspi_nrfx_data qspi_data = {									\
+		.xfer = Z_SEM_INITIALIZER(qspi_data.xfer, 1, UINT_MAX),					\
 		.busy = false,															\
 	};																			\
 	DEVICE_DEFINE(qspi, DT_NORDIC_NRF_QSPI_QSPI_0_LABEL,	       				\
 		      qspi_init,					       								\
 		      qspi_nrfx_pm_control,				       							\
-		      &qspi_data,				       											\
+		      &qspi_data,				       									\
 		      NULL,				       											\
 		      POST_KERNEL, CONFIG_QSPI_INIT_PRIORITY,		      	 			\
 		      &qspi_nrfx_driver_api)

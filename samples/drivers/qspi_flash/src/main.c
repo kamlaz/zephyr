@@ -48,7 +48,7 @@ struct device *qspi;				// Defines pointer to qspi device
 struct qspi_config qspi_cfg;		// Config for qspi device
 
 /* Private function prototypes -----------------------------------------------*/
-static void qspi_configure(struct qspi_config * pCfg);
+static void qspi_config(struct qspi_config * pCfg);
 //void qspi_init(uint32_t frequency, uint8_t addressMode, uint8_t dataLines);
 
 /* TESTING FUNCTIONS */
@@ -75,26 +75,27 @@ void main(void)
 	}
 
 	/* Assign config */
-	qspi_configure(&qspi_cfg);
+	qspi_config(&qspi_cfg);
 
 	/* Set configuration of the driver */
-	qspi_set_act_mem(qspi, &qspi_cfg);
+	qspi_configure(qspi, &qspi_cfg);
 
 	u8_t txbuffer[8]={1,2,3,4,1,2,3,4};
 	u8_t rxbuffer[8]={0};
+	u8_t jedecId = 0x9F;
 	struct qspi_buf txBuff = {
-			.buf = txbuffer,
-			.len = sizeof(txbuffer)
+			.buf = &jedecId,
+			.len = 1
 	};
 
 	struct qspi_buf rxBuff = {
 			.buf = rxbuffer,
-			.len = sizeof(rxbuffer)
+			.len = 3
 	};
-
-	qspi_erase(qspi,0,0x1000U);
-	qspi_write(qspi, &txBuff, 0);
-	qspi_read(qspi, &rxBuff, 0);
+	qspi_send_cmd(qspi, &txBuff, &rxBuff);
+//	qspi_erase(qspi,0,0x1000U);
+//	qspi_write(qspi, &txBuff, 0);
+//	qspi_read(qspi, &rxBuff, 0);
 	printk("\nCHlosta");
 //	/* Identify the flash */
 //	LOG_INF("Vendor ID: %x", read_device_id());
@@ -119,7 +120,7 @@ void main(void)
 // * @param pCfg	- pointer to the qspi structure
 // * @retval None
 // */
-static void qspi_configure(struct qspi_config * pCfg){
+static void qspi_config(struct qspi_config * pCfg){
 	pCfg->cs_pin = DT_NORDIC_NRF_QSPI_40029000_JEDEC_QSPI_NOR_0_CS_PIN;
 	pCfg->frequency = 8000000;
 	pCfg->data_lines = QSPI_DATA_LINES_SINGLE;
@@ -166,93 +167,110 @@ static void qspi_configure(struct qspi_config * pCfg){
 //	return jedec_id;
 //}
 //
-///**
-// * @brief Performs basic test of the QSPI FLASH memory
-// *
-// * @param length	length of the tests in bytes
-// * @retval 0 If successful, errno code otherwise.
-// */
-//uint32_t memory_test(uint32_t length){
-//	LOG_INF("memory_test(%d)", length);
-//
-//	/* Check input parameter */
-//	if(length > FLASH_SECTOR_SIZE)
-//	{
-//		LOG_WRN("Simple memory test is limited to FLASH_SECTOR_SIZE=4096");
-//		return 1;
-//	}
-//	printf("\n Erasing memory...");
-//	/* Erase sector */
+/**
+ * @brief Performs basic test of the QSPI FLASH memory
+ *
+ * @param length	length of the tests in bytes
+ * @retval 0 If successful, errno code otherwise.
+ */
+uint32_t memory_test(uint32_t length){
+	LOG_INF("memory_test(%d)", length);
+
+	struct qspi_buf rxBuff = {
+			.buf = chip_mem,
+			.len = length
+	};
+
+	struct qspi_buf txBuff = {
+			.buf = test,
+			.len = length
+	};
+
+	/* Check input parameter */
+	if(length > FLASH_SECTOR_SIZE)
+	{
+		LOG_WRN("Simple memory test is limited to FLASH_SECTOR_SIZE=4096");
+		return 1;
+	}
+	printf("\n Erasing memory...");
+	/* Erase sector */
+
 //	if(qspi_cmd_xfer(qspi, &qspi_cfg, NULL, 0, NULL ,0 , QSPI_STD_CMD_SE, 0) != HAL_OK){
-//		/* Erasing status: ERROR */
-//		LOG_WRN("Unable to sector erase");
-//		return 2;
-//	}
-//	printf("OK");
-//	printf("\n Reading memory...");
-//	/* Chip read */
+	if(qspi_erase(qspi,0,0x1000U) != HAL_OK){
+		/* Erasing status: ERROR */
+		LOG_WRN("Unable to sector erase");
+		return 2;
+	}
+	printf("OK");
+	printf("\n Reading memory...");
+	/* Chip read */
 //	if(qspi_read(qspi, &qspi_cfg, chip_mem, length, 0) != HAL_OK){
-//		/* Reading status: ERROR */
-//		LOG_WRN("Unable to read data");
-//		return 3;
-//	}
-//	printf("OK");
-//	printf("\n Checking memory...");
-//
-//	/* Memory check -  expect all 1s */
-//	for(uint16_t i = 0; i < length; i++)
-//	{
-//		if(chip_mem[i] != 0xFF)
-//		{
-//			LOG_WRN("Memory read incorrect %d = %x", i, chip_mem[i]);
-//		return 4;
-//		}
-//	}
-//
-//	printf("OK");
-//	printf("\n Writting to memory...");
-//	/* Fill Tx buff with data */
-//	for(uint32_t i = 0; i < length; i++)
-//	{
-//		test[i] = i % 0xFF;
-//	}
-//
-//	/* Chip write */
+
+	if(qspi_read(qspi, &rxBuff, 0) != HAL_OK){
+		/* Reading status: ERROR */
+		LOG_WRN("Unable to read data");
+		return 3;
+	}
+	printf("OK");
+	printf("\n Checking memory...");
+
+	/* Memory check -  expect all 1s */
+	for(uint16_t i = 0; i < length; i++)
+	{
+		if(chip_mem[i] != 0xFF)
+		{
+			LOG_WRN("Memory read incorrect %d = %x", i, chip_mem[i]);
+		return 4;
+		}
+	}
+
+	printf("OK");
+	printf("\n Writting to memory...");
+	/* Fill Tx buff with data */
+	for(uint32_t i = 0; i < length; i++)
+	{
+		test[i] = i % 0xFF;
+	}
+
+
+	/* Chip write */
 //	if(qspi_write(qspi, &qspi_cfg, test, length, 0) != HAL_OK){
-//		/* Writting status: ERROR */
-//		LOG_WRN("Unable to write data");
-//		return 5;
-//	}
-//
-//	printf("OK");
-//	printf("\n Reading memory...");
-//	/* Chip read */
+	if(qspi_write(qspi, &txBuff, 0) != HAL_OK){
+		/* Writting status: ERROR */
+		LOG_WRN("Unable to write data");
+		return 5;
+	}
+
+	printf("OK");
+	printf("\n Reading memory...");
+	/* Chip read */
 //	if(qspi_read(qspi, &qspi_cfg, chip_mem, length, 0) != HAL_OK){
-//		/* Reading status: ERROR */
-//		LOG_WRN("Unable to read data");
-//		return 6;
-//	}
-//
-//	printf("OK");
-//	printf("\n Comparing memory...");
-//
-//	/* Compare write to read */
-//	for(uint32_t i = 0; i < length; i++)
-//	{
-//		if(test[i] != chip_mem[i])
-//		{
-//			LOG_WRN("Error: compare write to read mismatch %x vs %x", test[i], chip_mem[i]);
-//			return 7;
-//		}
-//	}
-//
-//
-//	printf("OK");
-//
-//	LOG_INF("Memory test OK");
-//
-//	return 0;
-//}
+	if(qspi_read(qspi, &rxBuff, 0) != HAL_OK){
+	/* Reading status: ERROR */
+		LOG_WRN("Unable to read data");
+		return 6;
+	}
+
+	printf("OK");
+	printf("\n Comparing memory...");
+
+	/* Compare write to read */
+	for(uint32_t i = 0; i < length; i++)
+	{
+		if(test[i] != chip_mem[i])
+		{
+			LOG_WRN("Error: compare write to read mismatch %x vs %x", test[i], chip_mem[i]);
+			return 7;
+		}
+	}
+
+
+	printf("OK");
+
+	LOG_INF("Memory test OK");
+
+	return 0;
+}
 //
 ///**
 // * @brief Performs comples test of the QSPI FLASH memory and QSPI bus
