@@ -86,10 +86,16 @@ struct qspi_config {
 
 	/* Polarity, phase, Mode
 	 * 0x00: Mode 0: Data are captured on the clock rising edge and
-	 * 			data is output on a falling edge. Base level of clock is 0.
+	 * 			data are sampled on a leading edge. Base level of clock is 0.
 	 * 			(CPOL=0, CPHA=0).
+	 * 0x01: Mode 1: Data are captured on the clock rising edge and
+	 * 			data are sampled on a trailing edge. Base level of clock is 0.
+	 * 			(CPOL=0, CPHA=1).
+	 * 0x02: Mode 2: Data are captured on the clock falling edge and
+	 * 			data are sampled on a leading edge. Base level of clock is 1.
+	 * 			(CPOL=1, CPHA=0).
 	 * 0x03: Mode 3: Data are captured on the clock falling edge and
-	 * 			data is output on a rising edge. Base level of clock is 1.
+	 * 			data are sampled on a trailing edge. Base level of clock is 1.
 	 * 			(CPOL=1, CPHA=1).
 	 * */
 	u8_t mode:2;
@@ -109,7 +115,19 @@ struct qspi_config {
 	 * */
 	u8_t address:2;
 
-	/* Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands. */
+	/* Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands.
+	 * Note: Refer to the chip manufacturer to check what clock source is used to generate cs_high_time.
+	 * In most cases it is system clock, but sometimes it is independent QSPI clock with prescaler.
+	 *
+	 *										  |<-CS_HIGH_TIME->|
+	 *          .---.                         .----------------.
+	 *     CS  -'   '-------------------------'                '-----------------
+	 *              .-. .-. .-. .-. .-. .-. .-.                  .-. .-. .-. .-. .-.
+	 *     SCK -----' '-' '-' '-' '-' '-' '-' '------------------' '-' '-' '-' '-' '-
+	 *            .---.---.---.---.---.---.---.                .---.---.---.---.---
+	 *     SD     |MSB|   |...|   |   |   |LSB|                |MSB|...|   |LSB|
+	 *        ----'---'---'---'---'---'---'---'----------------'---'---'---'---'---
+	*/
 	u8_t cs_high_time;
 };
 
@@ -120,11 +138,11 @@ struct qspi_config {
  * public documentation.
  */
 /**
- * @typedef qspi_api_set_act_mem
+ * @typedef qspi_api_configure
  * @brief Callback API for I/O
- * See qspi_set_act_mem() for argument descriptions
+ * See qspi_configure() for argument descriptions
  */
-typedef int (*qspi_api_set_act_mem)(struct device *dev,
+typedef int (*qspi_api_configure)(struct device *dev,
 				const struct qspi_config *config);
 
 /**
@@ -173,7 +191,7 @@ struct qspi_driver_api {
 	qspi_api_read 			read;
 	qspi_api_send_cmd 		send_cmd;
 	qspi_api_erase 			erase;
-	qspi_api_set_act_mem 	set_act_mem;
+	qspi_api_configure 	configure;
 };
 /**
  * @endcond
@@ -269,15 +287,29 @@ static inline int z_impl_qspi_send_cmd(struct device *dev, const struct qspi_buf
 }
 
 /**
- * @brief Erases desired amount of flash memory - one memory block - 4KB, 64KB, or the whole chip.
- *
+ * @brief Erases desired amount of flash memory.
+ *  It is possible to erase memory area with granularity of :
+ *  - 4KB (the least amount of memory to erase)
+ *  - 32kB (if chip supports this function)
+ *  - 64KB
+ *  - whole chip.
+ *	One can also erase memory that is multiple or sum of the listed above values.
+ *	i.e user can erase memory area of 100 kB (64kB + 32kB + 4 kB).
  * Note: This function is synchronous.
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param start_address Memory address to start erasing.
+ * Address has to be sector alligned. (i.e it is impossible to erase
+ * memory area that begins at 0x800, since it is not sector alligned memory region)
  * If chip erase is performed, address field is ommited.
  *
  * @param length Size of data to erase.
+ * It could be:
+ * 		- sector aligned (if sector has to be erased)
+ * 		- block (32kB) aligned (if 32kB block has to be erased)
+ * 		- block (64kB) aligned (if 64kB block has to be erased)
+ * 		- whole chip - 0XFFFFFFFF
+ * 		- custom area, but sector alligned
 
  * @retval  0 in case of success
  * @retval	-ENXIO No such device or address
@@ -310,14 +342,14 @@ static inline int z_impl_qspi_erase(struct device *dev, u32_t start_address, u32
  * @retval	-EBUSY device busy
  * @retval	-ETIMEDOUT timeout
  */
-__syscall int qspi_set_act_mem(struct device *dev, const struct qspi_config *config);
+__syscall int qspi_configure(struct device *dev, const struct qspi_config *config);
 
-static inline int z_impl_qspi_set_act_mem(struct device *dev, const struct qspi_config *config)
+static inline int z_impl_qspi_configure(struct device *dev, const struct qspi_config *config)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
 
-	return api->set_act_mem(dev, config);
+	return api->configure(dev, config);
 }
 
 
