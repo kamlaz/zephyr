@@ -45,6 +45,12 @@ LOG_MODULE_REGISTER(qspi_nrfx_qspi);
 struct qspi_nrfx_data {
 	struct k_sem xfer;
 	u8_t   busy;
+	int status;
+#ifdef CONFIG_QSPI_ASYNC
+	struct k_poll_signal *signal;
+	//bool asynchronous;
+#endif /* CONFIG_QSPI_ASYNC */
+
 #ifdef CONFIG_DEVICE_POWER_MANAGEMENT
 	u32_t pm_state;
 #endif
@@ -55,14 +61,21 @@ struct qspi_nrfx_config {
 	nrfx_qspi_config_t config;
 };
 static const struct qspi_nrfx_config qspi_conf;
-
+static nrfx_qspi_config_t QSPIconfig;
 
 /* Exported types ------------------------------------------------------------*/
 int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address);
 int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address);
-int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const struct qspi_buf *rx_buf);
+int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_cmd *cmd, const struct qspi_buf *rx_buf);
 int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size);
 int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config);
+
+#ifdef CONFIG_QSPI_ASYNC
+int qspi_nrfx_write_async(struct device *dev, const struct qspi_buf *tx_buf, u32_t address, struct k_poll_signal *async);
+int qspi_nrfx_read_async(struct device *dev, const struct qspi_buf *rx_buf, u32_t address, struct k_poll_signal *async);
+int qspi_nrfx_send_cmd_async(struct device *dev, const struct qspi_cmd *cmd, const struct qspi_buf *rx_buf, struct k_poll_signal *async);
+int qspi_nrfx_erase_async(struct device *dev, u32_t addr, u32_t size, struct k_poll_signal *async);
+#endif /* CONFIG_QSPI_ASYNC */
 
 static inline void qspi_fill_init_struct(const struct qspi_config * config,nrfx_qspi_config_t * initStruct);
 static inline int get_nrf_qspi_readoc(u8_t data_lines);
@@ -82,6 +95,27 @@ static const struct qspi_driver_api qspi_nrfx_driver_api = {
 static inline struct qspi_nrfx_data *get_dev_data(struct device *dev)
 {
 	return dev->driver_data;
+}
+
+static inline void qspi_lock(struct device *dev,
+				    struct k_poll_signal *signal)
+{
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+	k_sem_take(&dev_data->xfer, K_FOREVER);
+//	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
+
+#ifdef CONFIG_SPI_ASYNC
+	dev_data->signal = signal;
+#endif /* CONFIG_SPI_ASYNC */
+}
+
+static inline void qspi_unlock(struct device *dev)
+{
+	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
+#ifdef CONFIG_SPI_ASYNC
+	k_poll_signal_raise(dev_data->signal, dev_data->status);
+#endif /* CONFIG_SPI_ASYNC */
+	k_sem_give(&dev_data->xfer);
 }
 
 /**
@@ -218,39 +252,85 @@ static void qspi_handler(nrfx_qspi_evt_t event, void * p_context)
 
 	if (event == NRFX_QSPI_EVENT_DONE) {
 	/* Add functionality */
+	qspi_unlock(dev);
+
 	}
-	k_sem_give(&dev_data->xfer);
 }
 
 int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address){
 	/* Check input parameters */
-	if (!dev) 		{ return -ENXIO;}
-	if (!tx_buf)	{ return -EINVAL;}
+	if (!dev) 							{ return -ENXIO;}
+	if (!tx_buf)						{ return -EINVAL;}
+	if (tx_buf->len % sizeof(uint32_t))	{ return -EINVAL;}	//write size must be multiple of 4 bytes
 
-	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
+	qspi_lock(dev, NULL);
+
+
 	int result = 0;
 	return nrfx_qspi_write(tx_buf->buf, tx_buf->len, address);
 }
 
 int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address){
 	/* Check input parameters */
-	if (!dev) 		{ return -ENXIO;}
-	if (!rx_buf)	{ return -EINVAL;}
-	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
+	if (!dev) 							{ return -ENXIO;}
+	if (!rx_buf)						{ return -EINVAL;}
+	if (rx_buf->len % sizeof(uint32_t))	{ return -EINVAL;}	//read size must be multiple of 4 bytes
+	qspi_lock(dev, NULL);
 
 	int result = 0;
 	return nrfx_qspi_read(rx_buf->buf, rx_buf->len, address);
 }
 
-int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const struct qspi_buf *rx_buf){
+int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_cmd *cmd, const struct qspi_buf *rx_buf){
 	/* Check input parameters */
 	if (!dev) 		{ return -ENXIO;}
-	if (!rx_buf)	{ return -EINVAL;}
-	k_sem_take(&(get_dev_data(dev)->xfer), K_FOREVER);
+	if (!cmd)		{ return -EINVAL;}
+	qspi_lock(dev, NULL);
+
+	uint8_t tmp_buff[9] = {0};
+	uint8_t cmd_size = 0;
+
+	/* Fill address field */
+	if(cmd->addr != 0xFFFFFFFF){
+		/* Copy address field to the buffer */
+		if(QSPIconfig.prot_if.addrmode == NRF_QSPI_ADDRMODE_24BIT){
+			//Copy 24 bit address
+			tmp_buff[0] = (uint8_t)(cmd->addr >> 16);
+			tmp_buff[1] = (uint8_t)(cmd->addr >> 8);
+			tmp_buff[2] = (uint8_t)(cmd->addr);
+			cmd_size += 3;
+		}
+		else{
+			//Copy 32 bit address
+			tmp_buff[0] = (uint8_t)(cmd->addr >> 24);
+			tmp_buff[1] = (uint8_t)(cmd->addr >> 16);
+			tmp_buff[2] = (uint8_t)(cmd->addr >> 8);
+			tmp_buff[3] = (uint8_t)(cmd->addr);
+			cmd_size += sizeof(uint32_t);
+		}
+	}
+
+	if(cmd->tx_buf != NULL && rx_buf != NULL){
+		/* If there is a msg - copy it to the buffer */
+		if(cmd->tx_buf->len > 0){
+			memcpy(&tmp_buff[cmd_size],cmd->tx_buf->buf,cmd->tx_buf->len);
+		}
+		cmd_size +=(cmd->tx_buf->len + rx_buf->len);
+	}
+	else if(cmd->tx_buf != NULL && rx_buf == NULL){
+		if(cmd->tx_buf->len > 0){
+			memcpy(&tmp_buff[cmd_size],cmd->tx_buf->buf,cmd->tx_buf->len);
+		}
+		cmd_size +=(cmd->tx_buf->len);
+	}
+	else if(cmd->tx_buf == NULL && rx_buf != NULL){
+		cmd_size +=(rx_buf->len);
+	}
+
 
 	nrf_qspi_cinstr_conf_t cinstr_cfg = {
-		.opcode    = tx_buf->buf[0],			// We assign here first element in the buffer, since it is command
-		.length    = tx_buf->len + rx_buf->len,
+		.opcode    = cmd->op_code,
+		.length    = cmd_size +  sizeof(cmd->op_code),
 		.io2_level = true,
 		.io3_level = true,
 		.wipwait   = true,
@@ -258,7 +338,7 @@ int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_buf *tx_buf, const 
 	};
 
 	/* We assigned &tx_buf->buf[1], becouse second element in the array is first byte of our tx buffer */
-	return nrfx_qspi_cinstr_xfer(&cinstr_cfg,&tx_buf->buf[1], rx_buf->buf);
+	return nrfx_qspi_cinstr_xfer(&cinstr_cfg,tmp_buff, rx_buf->buf);
 }
 
 int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size){
@@ -306,7 +386,7 @@ int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size){
 /* Configures QSPI memory for the transfer */
 int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config){
 	int rescode = 0;
-	static nrfx_qspi_config_t QSPIconfig;
+
 	qspi_fill_init_struct(config, &QSPIconfig);
 	rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
 	if (rescode != 0) {
@@ -320,6 +400,9 @@ int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config){
 	}
 	return 0;
 }
+
+
+
 
 /**
  * @brief Fills inits struct

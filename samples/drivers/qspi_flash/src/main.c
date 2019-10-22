@@ -43,6 +43,7 @@ enum{
 uint8_t chip_mem[TEST_MAX_MEM]={0};	// Holds data read from FLASH memory
 uint8_t test[TEST_MAX_MEM]={0};		// Holds data that will be sent to FLASH memory
 
+struct qspi_cmd cmdBuff;
 struct qspi_buf txBuff;
 struct device *qspi;				// Defines pointer to qspi device
 struct qspi_config qspi_cfg;		// Config for qspi device
@@ -84,18 +85,24 @@ void main(void)
 	u8_t rxbuffer[8]={0};
 	u8_t jedecId = 0x9F;
 	struct qspi_buf txBuff = {
-			.buf = &jedecId,
-			.len = 1
+			.buf = &txbuffer,
+			.len = 8
 	};
 
 	struct qspi_buf rxBuff = {
 			.buf = rxbuffer,
-			.len = 3
+			.len = 8
 	};
-	qspi_send_cmd(qspi, &txBuff, &rxBuff);
-//	qspi_erase(qspi,0,0x1000U);
-//	qspi_write(qspi, &txBuff, 0);
-//	qspi_read(qspi, &rxBuff, 0);
+
+	struct qspi_cmd cmdBuff = {
+			.op_code = 0x9F,
+			.addr = 0xFFFFFFFF,
+			.tx_buf = NULL,
+	};
+//	qspi_send_cmd(qspi, &cmdBuff, &rxBuff);
+	qspi_erase(qspi,0,0x1000U);
+	qspi_write(qspi, &txBuff, 0);
+	qspi_read(qspi, &rxBuff, 0);
 	printk("\nCHlosta");
 //	/* Identify the flash */
 //	LOG_INF("Vendor ID: %x", read_device_id());
