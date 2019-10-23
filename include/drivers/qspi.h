@@ -37,34 +37,37 @@ extern "C" {
  * @brief No of data lines that are used for the transfer.
  * Some flash memories supports one, two or four lines.
  */
-#define QSPI_DATA_LINES_SINGLE			0x00
-#define QSPI_DATA_LINES_DOUBLE			0x01
-#define QSPI_DATA_LINES_QUAD			0x02
+#define QSPI_DATA_LINES_SINGLE                  0x00
+#define QSPI_DATA_LINES_DOUBLE                  0x01
+#define QSPI_DATA_LINES_QUAD                    0x02
 
 /**
  * @brief QSPI mode of the transmission
- * For detailed description see @mode in @qspi_config
+ * For detailed description see mode in qspi_config
  */
-#define QSPI_MODE_0						0x00
-#define QSPI_MODE_1						0x01
-#define QSPI_MODE_2						0x02
-#define QSPI_MODE_3						0x03
+#define QSPI_MODE_0                             0x00
+#define QSPI_MODE_1                             0x01
+#define QSPI_MODE_2                             0x02
+#define QSPI_MODE_3                             0x03
 
 /**
  * @brief QSPI Address configuration
- * Length of the address field in bits. Typical flash chips support 24bit address mode
+ * Length of the address field in bits.
+ * Typical flash chips support 24bit address mode
  */
-#define QSPI_ADDRESS_MODE_8BIT			0x00
-#define QSPI_ADDRESS_MODE_16BIT			0x01
-#define QSPI_ADDRESS_MODE_24BIT			0x02
-#define QSPI_ADDRESS_MODE_32BIT			0x03
+#define QSPI_ADDRESS_MODE_8BIT                  0x00
+#define QSPI_ADDRESS_MODE_16BIT                 0x01
+#define QSPI_ADDRESS_MODE_24BIT                 0x02
+#define QSPI_ADDRESS_MODE_32BIT                 0x03
 
 /**
  * @brief QSPI buffer structure
  * Structure used both for TX and RX purposes.
  *
- * @param buf is a valid pointer to a data buffer. Can not be NULL.
- * @param len is the length of the data to be handled. If no data to transmit/receive - pass 0.
+ * @param buf is a valid pointer to a data buffer.
+ * Can not be NULL.
+ * @param len is the length of the data to be handled.
+ * If no data to transmit/receive - pass 0.
  */
 struct qspi_buf {
 	u8_t *buf;
@@ -91,7 +94,7 @@ struct qspi_cmd {
  * @brief QSPI controller configuration structure
  */
 struct qspi_config {
-	 /* Chip Select pin used to select memory */
+	/* Chip Select pin used to select memory */
 	u16_t cs_pin;
 
 	/* Frequency of the QSPI bus in [Hz]*/
@@ -99,48 +102,51 @@ struct qspi_config {
 
 	/* Polarity, phase, Mode
 	 * 0x00: Mode 0: Data are captured on the clock rising edge and
-	 * 			data are sampled on a leading edge. Base level of clock is 0.
-	 * 			(CPOL=0, CPHA=0).
+	 *			data are sampled on a leading edge.
+	 *			Base level of clock is 0.(CPOL=0, CPHA=0).
 	 * 0x01: Mode 1: Data are captured on the clock rising edge and
-	 * 			data are sampled on a trailing edge. Base level of clock is 0.
-	 * 			(CPOL=0, CPHA=1).
+	 *			data are sampled on a trailing edge.
+	 *			Base level of clock is 0.(CPOL=0, CPHA=1).
 	 * 0x02: Mode 2: Data are captured on the clock falling edge and
-	 * 			data are sampled on a leading edge. Base level of clock is 1.
-	 * 			(CPOL=1, CPHA=0).
+	 *			data are sampled on a leading edge.
+	 *			Base level of clock is 1.(CPOL=1, CPHA=0).
 	 * 0x03: Mode 3: Data are captured on the clock falling edge and
-	 * 			data are sampled on a trailing edge. Base level of clock is 1.
-	 * 			(CPOL=1, CPHA=1).
-	 * */
-	u8_t mode:2;
+	 *			data are sampled on a trailing edge.
+	 *			Base level of clock is 1.(CPOL=1, CPHA=1).
+	 */
+	u8_t mode : 2;
 
 	/* Defines how many lines will be used for read/write operation
 	 * 0x00: One data line
 	 * 0x01: Two data lines
 	 * 0x02: Four data lines
-	 *  */
-	u8_t data_lines:2;
+	 */
+	u8_t data_lines : 2;
 
 	/* Defines how many bits are used for address (8/16/24/32)
 	 * 0x00: 8 bit address field
 	 * 0x01: 16 bit address field
 	 * 0x02: 24 bit address field
 	 * 0x03: 32 bit address field
-	 * */
-	u8_t address:2;
+	 */
+	u8_t address : 2;
 
-	/* Specifies the Chip Select High Time. No of clock cycles when CS must remain high between commands.
-	 * Note: Refer to the chip manufacturer to check what clock source is used to generate cs_high_time.
-	 * In most cases it is system clock, but sometimes it is independent QSPI clock with prescaler.
+	/* Specifies the Chip Select High Time.
+	 * No of clock cycles when CS must remain high between commands.
+	 * Note: Refer to the chip manufacturer to check what
+	 * clock source is used to generate cs_high_time. In most cases
+	 * it is system clock, but sometimes it is independent
+	 * QSPI clock with prescaler.
 	 *
-	 *										  |<-CS_HIGH_TIME->|
-	 *          .---.                         .----------------.
-	 *      CS -'   '-------------------------'                '-----------------
-	 *              .-. .-. .-. .-. .-. .-. .-.                  .-. .-. .-. .-. .-.
-	 *     SCK -----' '-' '-' '-' '-' '-' '-' '------------------' '-' '-' '-' '-' '-
-	 *            .---.---.---.---.---.---.---.                .---.---.---.---.---
-	 *    DATA    |MSB|   |...|   |   |   |LSB|                |MSB|...|   |LSB|
-	 *        ----'---'---'---'---'---'---'---'----------------'---'---'---'---'---
-	*/
+	 *                            |<-CS_HIGH_TIME->|
+	 *      .-.                   .----------------.
+	 *  CS -' '-------------------'                '----------
+	 *          .-. .-. .-. .-. .-.                  .-. .-. .-.
+	 * SCK -----' '-' '-' '-' '-' '------------------' '-' '-' '
+	 *        .---.---.---.---.---.                .---.---.---.
+	 * DATA   |MSB|   |...|   |LSB|                |MSB|...|LSB|
+	 *    ----'---'---'---'---'---'----------------'---'---'---'
+	 */
 	u8_t cs_high_time;
 };
 
@@ -238,16 +244,16 @@ typedef int (*qspi_api_erase_async)(struct device *dev,
  * This is the mandatory API any QSPI driver needs to expose.
  */
 struct qspi_driver_api {
-	qspi_api_configure 		configure;
-	qspi_api_write 			write;
-	qspi_api_read 			read;
-	qspi_api_send_cmd 		send_cmd;
-	qspi_api_erase 			erase;
+	qspi_api_configure configure;
+	qspi_api_write write;
+	qspi_api_read read;
+	qspi_api_send_cmd send_cmd;
+	qspi_api_erase erase;
 #ifdef CONFIG_QSPI_ASYNC
-	qspi_api_write_async 	write_async;
-	qspi_api_read_async 	read_async;
-	qspi_api_send_cmd_async	send_cmd_async;
-	qspi_api_erase_async 	erase_async;
+	qspi_api_write_async write_async;
+	qspi_api_read_async read_async;
+	qspi_api_send_cmd_async send_cmd_async;
+	qspi_api_erase_async erase_async;
 #endif /* CONFIG_QSPI_ASYNC */
 };
 /**
@@ -261,19 +267,22 @@ struct qspi_driver_api {
  * Note: This function is synchronous.
  * If user want to configure QSPI flash memory for usage with quad data lines,
  * one must set Quad Enble (QE) bit in Status Register. To do so use
- * @qspi_send_cmd function and Write Status Register (WRSR) command.
+ * qspi_send_cmd function and Write Status Register (WRSR) command.
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param config Pointer to the configuration structure. See @qspi_config structure for detailed description
+ * @param config Pointer to the configuration structure.
+ * See qspi_config structure for detailed description
  *
  * @retval  0 in case of success
  * @retval	-ENXIO No such device or address
  * @retval	-EINVAL invalid input parameter
  * @retval	-EBUSY device busy
  */
-__syscall int qspi_configure(struct device *dev, const struct qspi_config *config);
+__syscall int qspi_configure(struct device *dev,
+				const struct qspi_config *config);
 
-static inline int z_impl_qspi_configure(struct device *dev, const struct qspi_config *config)
+static inline int z_impl_qspi_configure(struct device *dev,
+				const struct qspi_config *config)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
@@ -292,13 +301,15 @@ static inline int z_impl_qspi_configure(struct device *dev, const struct qspi_co
  *	2. Enable write operation - using WREN (write enable) command
  *	3. Send data to write followed by desired write command (depends
  *	   on how many data lines are used) and address.
- *	For full list of supported commands refer to the manufacturers datasheet.
+ *	For full list of supported commands refer to the
+ *	manufacturers datasheet.
  *	If driver is configured to use four data lines one must
- *	enable quad transfer for the memory. Refer to @qspi_configure description.
+ *	enable quad transfer for the memory.
+ *	Refer to qspi_configure description.
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param tx_buf Buffer for transmit purpose.
- * 			For detailed description please refer to the @qspi_buf
+ *			For detailed description please refer to the qspi_buf
  * @param address Address where the data will be written.
  *
  * @retval  0 in case of success
@@ -306,9 +317,11 @@ static inline int z_impl_qspi_configure(struct device *dev, const struct qspi_co
  * @retval	-EINVAL invalid input parameter
  * @retval	-EBUSY device busy
  */
-__syscall int qspi_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address);
+__syscall int qspi_write(struct device *dev,
+				const struct qspi_buf *tx_buf, u32_t address);
 
-static inline int z_impl_qspi_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address)
+static inline int z_impl_qspi_write(struct device *dev,
+				const struct qspi_buf *tx_buf, u32_t address)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
@@ -327,13 +340,15 @@ static inline int z_impl_qspi_write(struct device *dev, const struct qspi_buf *t
  *	2. Send desired read command (depends
  *	   on how many data lines are used) and address.
  *
- *	For full list of supported commands refer to the manufacturers datasheet.
+ *	For full list of supported commands refer to the
+ *	manufacturers datasheet.
  *	If driver is configured to use four data lines one must
- *	enable quad transfer for the memory. Refer to @qspi_configure description.
+ *	enable quad transfer for the memory.
+ *	Refer to qspi_configure description.
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param rx_buf Buffer for receive purpose.
-			For detailed description please refer to the @qspi_buf
+			For detailed description please refer to the qspi_buf
  * @param address Address from the data will be read.
  *
  * @retval  0 in case of success
@@ -341,9 +356,11 @@ static inline int z_impl_qspi_write(struct device *dev, const struct qspi_buf *t
  * @retval	-EINVAL invalid input parameter
  * @retval	-EBUSY device busy
  */
-__syscall int qspi_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address);
+__syscall int qspi_read(struct device *dev,
+				const struct qspi_buf *rx_buf, u32_t address);
 
-static inline int z_impl_qspi_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address)
+static inline int z_impl_qspi_read(struct device *dev,
+				const struct qspi_buf *rx_buf, u32_t address)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
@@ -353,13 +370,17 @@ static inline int z_impl_qspi_read(struct device *dev, const struct qspi_buf *rx
 
 
 /**
- * @brief Function for sending operation code, sending data, and receiving data from the memory device.
+ * @brief Function for sending operation code, sending data
+ * and receiving data from the memory device.
  *
  * Note: This function is synchronous.
- * For command issuing driver uses only one data line. This is universal function, so user
- * can send i.e read/write/erase command using this command.
- * If user would like to send command with address and payload (i.e write command), one must
- * fill @op_code(i.e PP - Page Program - 0x02) and tx_buff (address and data).
+ * For command issuing driver uses only one data line.
+ * This is universal function, so user can send
+ * i.e read/write/erase command using this command.
+ * If user would like to send command with address and
+ * payload (i.e write command), one must
+ * fill op_code(i.e PP - Page Program - 0x02)
+ * and tx_buff (address and data).
  * For command structure refer to the memory manufacturers datasheet.
  *
  * Driver that realizes custom command functionality has to:
@@ -367,7 +388,8 @@ static inline int z_impl_qspi_read(struct device *dev, const struct qspi_buf *rx
  *	   (read status register) command
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param cmd Command structure. For detailed description please refer to the @qspi_cmd
+ * @param cmd Command structure.
+ * For detailed description please refer to the qspi_cmd
  *
  * @retval  0 in case of success
  * @retval	-ENXIO No such device or address
@@ -376,7 +398,8 @@ static inline int z_impl_qspi_read(struct device *dev, const struct qspi_buf *rx
  */
 __syscall int qspi_send_cmd(struct device *dev, const struct qspi_cmd *cmd);
 
-static inline int z_impl_qspi_send_cmd(struct device *dev, const struct qspi_cmd *cmd)
+static inline int z_impl_qspi_send_cmd(struct device *dev,
+				const struct qspi_cmd *cmd)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
@@ -391,8 +414,9 @@ static inline int z_impl_qspi_send_cmd(struct device *dev, const struct qspi_cmd
  *  - 32kB (if chip supports this function - defined in DTS)
  *  - 64KB
  *  - whole chip.
- *	One can also erase memory that is multiple or sum of the listed above values.
- *	i.e user can erase memory area of 100 kB (64kB + 32kB + 4 kB).
+ *	One can also erase memory that is multiple or sum of the
+ * listed above values. i.e user can erase memory
+ * area of 100 kB (64kB + 32kB + 4 kB).
  *
  * Note: This function is synchronous.
  * Driver that realizes erase functionality has to:
@@ -400,19 +424,21 @@ static inline int z_impl_qspi_send_cmd(struct device *dev, const struct qspi_cmd
  *	   (read status register) command
  *	2. Enable write operation - using WREN (write enable) command
  *	3. Send desired erase command (i.e SE - sector erase). Some erase
- *		commands require address (i.e Sector Erase, Block Erase) and one not (Chip Erase).
+ *		commands require address (i.e Sector Erase, Block Erase)
+ *		and one not (Chip Erase).
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param start_address Memory address to start erasing.
- * 		Address has to be sector alligned. (i.e it is impossible to erase
- * 		memory area that begins at 0x800, since it is not sector alligned memory region)
- * 		If chip erase is performed, address field is ommited.
+ *		Address has to be sector aligned. (i.e it is impossible
+ *		to erase memory area that begins at 0x800, since it is
+ *		not sector aligned memory region)
+ *		If chip erase is performed, address field is ommited.
  * @param length Size of data to erase.
  * It could be:
- * 		- any size, but sector aligned
- * 		- block (32kB) aligned (if 32kB block has to be erased)
- * 		- block (64kB) aligned (if 64kB block has to be erased)
- * 		- whole chip - pass 0XFFFFFFFF
+ *		- any size, but sector aligned
+ *		- block (32kB) aligned (if 32kB block has to be erased)
+ *		- block (64kB) aligned (if 64kB block has to be erased)
+ *		- whole chip - pass 0XFFFFFFFF
 
  * @retval  0 in case of success
  * @retval	-ENXIO No such device or address
@@ -421,7 +447,8 @@ static inline int z_impl_qspi_send_cmd(struct device *dev, const struct qspi_cmd
  */
 __syscall int qspi_erase(struct device *dev, u32_t start_address, u32_t length);
 
-static inline int z_impl_qspi_erase(struct device *dev, u32_t start_address, u32_t length)
+static inline int z_impl_qspi_erase(struct device *dev,
+				u32_t start_address, u32_t length)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
@@ -433,7 +460,8 @@ static inline int z_impl_qspi_erase(struct device *dev, u32_t start_address, u32
 
 #ifdef CONFIG_QSPI_ASYNC
 /**
- * @brief Writes desired amount of data to the external flash memory in asynchronous mode.
+ * @brief Writes desired amount of data to the external
+ * flash memory in asynchronous mode.
  *
  * Note: This function is asynchronous.
  * Driver that realizes write functionality has to:
@@ -442,13 +470,15 @@ static inline int z_impl_qspi_erase(struct device *dev, u32_t start_address, u32
  *	2. Enable write operation - using WREN (write enable) command
  *	3. Send data to write followed by desired write command (depends
  *	   on how many data lines are used) and address.
- *	For full list of supported commands refer to the manufacturers datasheet.
+ *	For full list of supported commands refer to the
+ *	manufacturers datasheet.
  *	If driver is configured to use four data lines one must
- *	enable quad transfer for the memory. Refer to @qspi_configure description.
+ *	enable quad transfer for the memory.
+ *	Refer to qspi_configure description.
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param tx_buf Buffer for transmit purpose.
- *			For detailed description please refer to the @qspi_buf
+ *			For detailed description please refer to the qspi_buf
  * @param address Address where the data will be written.
  * @param async A pointer to a valid and ready to be signaled
  *        struct k_poll_signal. (Note: if NULL this function will not
@@ -460,9 +490,13 @@ static inline int z_impl_qspi_erase(struct device *dev, u32_t start_address, u32
  * @retval	-EINVAL invalid input parameter
  * @retval	-EBUSY device busy
  */
-__syscall int qspi_write_async(struct device *dev, const struct qspi_buf *tx_buf, u32_t address, struct k_poll_signal *async);
+__syscall int qspi_write_async(struct device *dev,
+				const struct qspi_buf *tx_buf,
+				u32_t address, struct k_poll_signal *async);
 
-static inline int z_impl_qspi_write_async(struct device *dev, const struct qspi_buf *tx_buf, u32_t address, struct k_poll_signal *async)
+static inline int z_impl_qspi_write_async(struct device *dev,
+				const struct qspi_buf *tx_buf, u32_t address,
+				struct k_poll_signal *async)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
@@ -472,7 +506,8 @@ static inline int z_impl_qspi_write_async(struct device *dev, const struct qspi_
 
 
 /**
- * @brief Read desired amount of data from the external flash memory in asynchronous mode.
+ * @brief Read desired amount of data from the external flash memory
+ * in asynchronous mode.
  *
  * Note: This function is asynchronous.
  * Driver that realizes read functionality has to:
@@ -483,7 +518,7 @@ static inline int z_impl_qspi_write_async(struct device *dev, const struct qspi_
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param rx_buf Buffer for receive purpose. Consists of the fields:
- *			For detailed description please refer to the @qspi_buf
+ *			For detailed description please refer to the qspi_buf
  * @param address Address from the data will be read.
  * @param async A pointer to a valid and ready to be signaled
  *        struct k_poll_signal. (Note: if NULL this function will not
@@ -495,9 +530,12 @@ static inline int z_impl_qspi_write_async(struct device *dev, const struct qspi_
  * @retval	-EINVAL invalid input parameter
  * @retval	-EBUSY device busylength
  */
-__syscall int qspi_read_async(struct device *dev, const struct qspi_buf *rx_buf, u32_t address, struct k_poll_signal *async);
+__syscall int qspi_read_async(struct device *dev, const struct qspi_buf *rx_buf,
+				u32_t address, struct k_poll_signal *async);
 
-static inline int z_impl_qspi_read_async(struct device *dev, const struct qspi_buf *rx_buf, u32_t address, struct k_poll_signal *async)
+static inline int z_impl_qspi_read_async(struct device *dev,
+				const struct qspi_buf *rx_buf, u32_t address,
+				struct k_poll_signal *async)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
@@ -507,13 +545,16 @@ static inline int z_impl_qspi_read_async(struct device *dev, const struct qspi_b
 
 
 /**
- * @brief Function for sending operation code, sending data, and receiving data from the memory device.
+ * @brief Function for sending operation code, sending data
+ * and receiving data from the memory device.
  *
  * Note: This function is asynchronous.
- * For command issuing driver uses only one data line. This is universal function, so user
- * can send i.e read/write/erase command using this command.
- * If user would like to send command with address and payload (i.e write command), one must
- * fill @op_code(i.e PP - Page Program - 0x02) and tx_buff (address and data).
+ * For command issuing driver uses only one data line.
+ * This is universal function, so user can send
+ * i.e read/write/erase command using this command.
+ * If user would like to send command with address and payload
+ * (i.e write command), one must
+ * fill op_code(i.e PP - Page Program - 0x02) and tx_buff (address and data).
  * For command structure refer to the memory manufacturers datasheet.
  *
  * Driver that realizes custom command functionality has to:
@@ -521,7 +562,8 @@ static inline int z_impl_qspi_read_async(struct device *dev, const struct qspi_b
  *	   (read status register) command
  *
  * @param dev Pointer to the device structure for the driver instance
- * @param cmd Command structure. For detailed description please refer to the @qspi_cmd
+ * @param cmd Command structure.
+ * For detailed description please refer to the qspi_cmd
  * @param async A pointer to a valid and ready to be signaled
  *        struct k_poll_signal. (Note: if NULL this function will not
  *        notify the end of the transaction, and whether it went
@@ -532,9 +574,13 @@ static inline int z_impl_qspi_read_async(struct device *dev, const struct qspi_b
  * @retval	-EINVAL invalid input parameter
  * @retval	-EBUSY device busy
  */
-__syscall int qspi_send_cmd_async(struct device *dev, const struct qspi_cmd *cmd, struct k_poll_signal *async);
+__syscall int qspi_send_cmd_async(struct device *dev,
+				const struct qspi_cmd *cmd,
+				struct k_poll_signal *async);
 
-static inline int z_impl_qspi_send_cmd_async(struct device *dev, const struct qspi_cmd *cmd, struct k_poll_signal *async)
+static inline int z_impl_qspi_send_cmd_async(struct device *dev,
+				const struct qspi_cmd *cmd,
+				struct k_poll_signal *async)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
@@ -550,8 +596,9 @@ static inline int z_impl_qspi_send_cmd_async(struct device *dev, const struct qs
  *  - 32kB (if chip supports this function)
  *  - 64kB
  *  - whole chip.
- *	One can also erase memory that is multiple or sum of the listed above values.
- *	i.e user can erase memory area of 100 kB (64kB + 32kB + 4 kB).
+ *	One can also erase memory that is multiple
+ *	or sum of the listed above values. i.e user can erase
+ *	memory area of 100 kB (64kB + 32kB + 4 kB).
  *
  * Note: This function is asynchronous.
  * Driver that realizes erase functionality has to:
@@ -559,20 +606,22 @@ static inline int z_impl_qspi_send_cmd_async(struct device *dev, const struct qs
  *	   (read status register) command
  *	2. Enable write operation - using WREN (write enable) command
  *	3. Send desired erase command (i.e SE - sectore erase). Some erase
- *		commands require address (i.e Sector Erase, Block Erase) and one not (Chip Erase).
+ *		commands require address (i.e Sector Erase, Block Erase)
+ *		and one not (Chip Erase).
  *
  * @param dev Pointer to the device structure for the driver instance
  * @param start_address Memory address to start erasing.
- * 		Address has to be sector alligned. (i.e it is impossible to erase
- * 		memory area that begins at 0x800, since it is not sector alligned memory region)
- * 		If chip erase is performed, address field is ommited.
+ *		Address has to be sector aligned. (i.e it is impossible
+ *		to erase memory area that begins at 0x800,
+ *		since it is not sector aligned memory region)
+ *		If chip erase is performed, address field is ommited.
  * @param length Size of data to erase.
- * 		It could be:
- * 		- sector aligned (if sector has to be erased)
- * 		- block (32kB) aligned (if 32kB block has to be erased)
- * 		- block (64kB) aligned (if 64kB block has to be erased)
- * 		- whole chip - 0XFFFFFFFF
- * 		- custom area, but sector alligned
+ *		It could be:
+ *		- sector aligned (if sector has to be erased)
+ *		- block (32kB) aligned (if 32kB block has to be erased)
+ *		- block (64kB) aligned (if 64kB block has to be erased)
+ *		- whole chip - 0XFFFFFFFF
+ *		- custom area, but sector aligned
  * @param async A pointer to a valid and ready to be signaled
  *        struct k_poll_signal. (Note: if NULL this function will not
  *        notify the end of the transaction, and whether it went
@@ -583,9 +632,12 @@ static inline int z_impl_qspi_send_cmd_async(struct device *dev, const struct qs
  * @retval	-EINVAL invalid input parameter
  * @retval	-EBUSY device busy
  */
-__syscall int qspi_erase_async(struct device *dev, u32_t start_address, u32_t length, struct k_poll_signal *async);
+__syscall int qspi_erase_async(struct device *dev, u32_t start_address,
+				u32_t length, struct k_poll_signal *async);
 
-static inline int z_impl_qspi_erase_async(struct device *dev, u32_t start_address, u32_t length, struct k_poll_signal *async)
+static inline int z_impl_qspi_erase_async(struct device *dev,
+				u32_t start_address, u32_t length,
+				struct k_poll_signal *async)
 {
 	const struct qspi_driver_api *api =
 		(const struct qspi_driver_api *)dev->driver_api;
