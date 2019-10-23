@@ -26,6 +26,12 @@ target_comm_t g_target_comm;
 #endif
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
+/* size of stack area used by each thread */
+#define STACKSIZE 1024
+
+/* scheduling priority used by each thread */
+#define PRIORITY 7
+
 #define QSPI_STD_CMD_JEDEC_ID	0x9F	// CMD: Jedec ID
 #define QSPI_STD_CMD_SE			0x20	// CMD: Sector erase
 
@@ -48,6 +54,16 @@ struct qspi_buf txBuff;
 struct device *qspi;				// Defines pointer to qspi device
 struct qspi_config qspi_cfg;		// Config for qspi device
 
+
+#define STACKSIZE 1024
+
+/* scheduling priority used by each thread */
+static struct k_poll_signal async_sig = K_POLL_SIGNAL_INITIALIZER(async_sig);
+static struct k_poll_event async_evt =
+	K_POLL_EVENT_INITIALIZER(K_POLL_TYPE_SIGNAL,
+				 K_POLL_MODE_NOTIFY_ONLY,
+				 &async_sig);
+#define PRIORITY 7
 /* Private function prototypes -----------------------------------------------*/
 static void qspi_config(struct qspi_config * pCfg);
 //void qspi_init(uint32_t frequency, uint8_t addressMode, uint8_t dataLines);
@@ -115,7 +131,10 @@ void main(void)
 		tca_send_and_receive(&g_target_comm);
 	}
 #endif
-
+//while(1){
+//	k_sleep(500);
+//	printk("\n MAIN TASK");
+//}
 	LOG_INF("End.");
 }
 
@@ -130,7 +149,11 @@ void main(void)
 static void qspi_config(struct qspi_config * pCfg){
 	pCfg->cs_pin = DT_NORDIC_NRF_QSPI_40029000_JEDEC_QSPI_NOR_0_CS_PIN;
 	pCfg->frequency = 8000000;
-	pCfg->data_lines = QSPI_DATA_LINES_SINGLE;
+	pCfg->data_lines = QSPI_DATA_LINES_SINGLE;/* size of stack area used by each thread */
+#define STACKSIZE 1024
+
+/* scheduling priority used by each thread */
+#define PRIORITY 7
 	pCfg->address = QSPI_ADDRESS_MODE_24BIT;
 	pCfg->cs_high_time = 0;
 	pCfg->mode = QSPI_MODE_0;
@@ -166,7 +189,8 @@ static void qspi_config(struct qspi_config * pCfg){
 //	if(qspi_cmd_xfer(qspi, &qspi_cfg, NULL, 0, chip_mem ,JEDEC_ID_SIZE , QSPI_STD_CMD_JEDEC_ID, 0) != HAL_OK){
 //		/* Erasing status: ERROR */
 //		LOG_WRN("Unable to sector erase");
-//		return 1;
+//		return 1;/* size of stack area used by each thread */
+
 //	}
 //
 //	memcpy(&jedec_id,chip_mem,JEDEC_ID_SIZE);
@@ -247,7 +271,11 @@ uint32_t memory_test(uint32_t length){
 		LOG_WRN("Unable to write data");
 		return 5;
 	}
+	/* size of stack area used by each thread */
+	#define STACKSIZE 1024
 
+	/* scheduling priority used by each thread */
+	#define PRIORITY 7
 	printf("OK");
 	printf("\n Reading memory...");
 	/* Chip read */
@@ -309,3 +337,56 @@ uint32_t memory_test(uint32_t length){
 //	printf("\nPassed: %d", success);
 //	return result;
 //}
+void blink1(void)
+{
+//	blink(PORT0, 100, LED0, 0);
+	while(1){
+		printk("\n ERASING");
+		if(qspi_erase(qspi,0,0x1000U) != NRFX_SUCCESS){
+			printk("\n ERASE FAILED");
+		}
+		else{
+			printk("\n ERASE SUCCESS");
+		}
+//		printk("\n TASK1");
+//		qspi_erase(qspi,0,0x1000U);
+		k_sleep(1000);
+	}
+}
+
+void blink2(void)
+{
+//	blink(PORT1, 1000, LED1, 1);
+	while(1){
+		printk("\n WRITTING");
+		u8_t txbuffer[8]={1,2,3,4,1,2,3,4};
+		struct qspi_buf txBuff = {
+				.buf = &txbuffer,
+				.len = 8
+		};
+		if(qspi_write(qspi, &txBuff, 0) != NRFX_SUCCESS){
+			printk("\n WRITE FAILED");
+		}
+		else{
+			printk("\n WRITE SUCCESS");
+		}
+		k_sleep(1000);
+	}
+
+}
+void blink3(void)
+{
+//	blink(PORT1, 1000, LED1, 1);
+	while(1){
+		printk("\n TASK3");
+		k_sleep(500);
+	}
+}
+
+
+K_THREAD_DEFINE(blink1_id, STACKSIZE, blink1, NULL, NULL, NULL,
+		PRIORITY, 0, 200);
+K_THREAD_DEFINE(blink2_id, STACKSIZE, blink2, NULL, NULL, NULL,
+		PRIORITY, 0, 300);
+//K_THREAD_DEFINE(blink3_id, STACKSIZE, blink3, NULL, NULL, NULL,
+//		PRIORITY, 0, 300);
