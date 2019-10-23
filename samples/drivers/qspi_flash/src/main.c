@@ -112,7 +112,6 @@ void main(void)
 
 	struct qspi_cmd cmdBuff = {
 			.op_code = 0x9F,
-			.addr = 0xFFFFFFFF,
 			.tx_buf = NULL,
 	};
 //	qspi_send_cmd(qspi, &cmdBuff, &rxBuff);
