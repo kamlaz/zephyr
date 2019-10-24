@@ -14,10 +14,8 @@
 struct qspi_nor_config {
 	/* JEDEC id from devicetree */
 	u8_t id[QSPI_NOR_MAX_ID_LEN];
-
 	/* Indicates support for BE32K */
 	bool has_be32k;
-
 	/* Size from devicetree, in bytes */
 	u32_t size;
 };

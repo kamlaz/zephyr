@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Savoir-Faire Linux.
+ * Copyright (c) 2019, Nordic Semiconductor ASA
  *
  * This driver is heavily inspired from the spi_flash_w25qxxdv.c SPI NOR driver.
  *
@@ -21,19 +21,16 @@ LOG_MODULE_REGISTER(qspi_nor, CONFIG_FLASH_LOG_LEVEL);
 #define QSPI_NOR_MAX_ADDR_WIDTH 4
 
 /**
- * struct spi_nor_data - Structure for defining the SPI NOR access
- * @spi: The SPI device
- * @spi_cfg: The SPI configuration
- * @cs_ctrl: The GPIO pin used to emulate the SPI CS if required
+ * struct qspi_nor_data - Structure for defining the QSPI NOR access
+ * @qspi: The QSPI device
+ * @qspi_cfg: The QSPI configuration
  * @sem: The semaphore to access to the flash
  */
 struct qspi_nor_data {
 	struct device *qspi;
 	struct qspi_config qspi_cfg;
-#ifdef DT_INST_0_JEDEC_QSPI_NOR_CS_GPIOS_CONTROLLER
-	struct qspi_cs_control cs_ctrl;
-#endif /* DT_INST_0_JEDEC_SPI_NOR_CS_GPIOS_CONTROLLER */
 	struct k_sem sem;
+	bool write_protection;
 };
 
 #if defined(CONFIG_MULTITHREADING)
@@ -47,6 +44,21 @@ struct qspi_nor_data {
 #define SYNC_UNLOCK()
 #endif
 
+static int qspi_set_active_mem(struct device *dev)
+{
+	struct qspi_nor_data *const driver_data = dev->driver_data;
+	static uint16_t current_mem = 0xFFFF;
+	int ret = 0;
+	/* We are using CS pin number to identify which memory is selected,
+	 * as it is easy to compare and unique for every memory attached.
+	 */
+	if (current_mem != driver_data->qspi_cfg.cs_pin) {
+		ret = qspi_configure(driver_data->qspi, &driver_data->qspi_cfg);
+		current_mem = driver_data->qspi_cfg.cs_pin;
+	}
+//	printk("%d", driver_data->qspi_cfg.cs_pin);
+	return 0;
+}
 
 /**
  * @brief Retrieve the Flash JEDEC ID and compare it with the one expected
@@ -59,16 +71,28 @@ static inline int qspi_nor_read_id(struct device *dev,
 				  const struct qspi_nor_config *const flash_id)
 {
 	struct qspi_nor_data *const driver_data = dev->driver_data;
-	const struct qspi_nor_config *params = dev->config->config_info;
 
+	int ret = qspi_set_active_mem(dev);
+	if (ret != 0) {
+		return ret;
+	}
 
-	u8_t buf[QSPI_NOR_MAX_ID_LEN];
+	u8_t rx_b[QSPI_NOR_MAX_ID_LEN];
+	struct qspi_buf q_rx_buf = {
+		.buf = rx_b,
+		.len = QSPI_NOR_MAX_ID_LEN
+	};
+	struct qspi_cmd cmd = {
+		.op_code = QSPI_NOR_CMD_RDID,
+		.rx_buf = &q_rx_buf,
+		.tx_buf = NULL
+	};
 
-	if(qspi_cmd_xfer(driver_data->qspi, &driver_data->qspi_cfg, NULL, 0, buf ,QSPI_NOR_MAX_ID_LEN , QSPI_NOR_CMD_RDID, 0) != 0){
+	if(qspi_send_cmd(driver_data->qspi, &cmd) != 0){
 		return -EIO;
 	}
 
-	if (memcmp(flash_id->id, buf, QSPI_NOR_MAX_ID_LEN) != 0) {
+	if (memcmp(flash_id->id, rx_b, QSPI_NOR_MAX_ID_LEN) != 0) {
 		return -ENODEV;
 	}
 
@@ -81,16 +105,22 @@ static int qspi_nor_read(struct device *dev, off_t addr, void *dest,
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
 
-	int ret;
+	int ret = qspi_set_active_mem(dev);
+	if (ret != 0) {
+		return ret;
+	}
 
 	/* should be between 0 and flash size */
 	if ((addr < 0) || ((addr + size) > params->size)) {
 		return -EINVAL;
 	}
-
+	struct qspi_buf rx_buf = {
+		.buf = dest,
+		.len = size
+	};
 	SYNC_LOCK();
 
-	ret = qspi_read(driver_data->qspi, &driver_data->qspi_cfg, dest, size, addr);
+	ret = qspi_read(driver_data->qspi, &rx_buf, addr);
 
 	SYNC_UNLOCK();
 
@@ -102,20 +132,30 @@ static int qspi_nor_write(struct device *dev, off_t addr, const void *src,
 {
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
-	int ret;
 
+	if (driver_data->write_protection) {
+		return -EACCES;
+	}
+
+	int ret = qspi_set_active_mem(dev);
+	if (ret != 0) {
+		return ret;
+	}
 	/* should be between 0 and flash size */
 	if ((addr < 0) || ((size + addr) > params->size)) {
 		return -EINVAL;
 	}
-
+	struct qspi_buf tx_buf = {
+		.buf = src,
+		.len = size
+	};
 	SYNC_LOCK();
 
-	ret = qspi_write(driver_data->qspi, &driver_data->qspi_cfg, src, size, addr);
+	ret = qspi_write(driver_data->qspi, &tx_buf, addr);
 
 	SYNC_UNLOCK();
 
-	return 0;
+	return ret;
 }
 
 static int qspi_nor_erase(struct device *dev, off_t addr, size_t size)
@@ -123,6 +163,14 @@ static int qspi_nor_erase(struct device *dev, off_t addr, size_t size)
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
 
+	if (driver_data->write_protection) {
+		return -EACCES;
+	}
+
+	int ret = qspi_set_active_mem(dev);
+	if (ret != 0) {
+		return ret;
+	}
 	/* should be between 0 and flash size */
 	if ((addr < 0) || ((size + addr) > params->size)) {
 		return -ENODEV;
@@ -130,60 +178,40 @@ static int qspi_nor_erase(struct device *dev, off_t addr, size_t size)
 
 	SYNC_LOCK();
 
-	while (size) {
-
-		if (size == params->size) {
-			/* chip erase */
-			qspi_cmd_xfer(driver_data->qspi, &driver_data->qspi_cfg, NULL, 0, NULL ,0 , QSPI_NOR_CMD_CE, 0);
-			size -= params->size;
-		} else if ((size >= QSPI_NOR_BLOCK_SIZE)
-			   && QSPI_NOR_IS_BLOCK_ALIGNED(addr)) {
-			/* 64 KiB block erase */
-			qspi_cmd_xfer(driver_data->qspi, &driver_data->qspi_cfg, NULL, 0, NULL ,0 , QSPI_NOR_CMD_BE, 0);
-			addr += QSPI_NOR_BLOCK_SIZE;
-			size -= QSPI_NOR_BLOCK_SIZE;
-		} else if ((size >= QSPI_NOR_BLOCK32_SIZE)
-			   && QSPI_NOR_IS_BLOCK32_ALIGNED(addr)) {
-			/* 32 KiB block erase */
-			qspi_cmd_xfer(driver_data->qspi, &driver_data->qspi_cfg, NULL, 0, NULL ,0 , QSPI_NOR_CMD_BE_32K, 0);
-			addr += QSPI_NOR_BLOCK32_SIZE;
-			size -= QSPI_NOR_BLOCK32_SIZE;
-		} else if ((size >= QSPI_NOR_SECTOR_SIZE)
-			   && QSPI_NOR_IS_SECTOR_ALIGNED(addr)) {
-			/* sector erase */
-			qspi_cmd_xfer(driver_data->qspi, &driver_data->qspi_cfg, NULL, 0, NULL ,0 , QSPI_NOR_CMD_SE, 0);
-			addr += QSPI_NOR_SECTOR_SIZE;
-			size -= QSPI_NOR_SECTOR_SIZE;
-		} else {
-			/* minimal erase size is at least a sector size */
-			SYNC_UNLOCK();
-			LOG_DBG("unsupported at 0x%lx size %zu", (long)addr,
-				size);
-			return -EINVAL;
-		}
-	}
+	ret = qspi_erase(driver_data->qspi, addr, size);
 
 	SYNC_UNLOCK();
 
-	return 0;
+	return ret;
 }
 
 static int qspi_nor_write_protection_set(struct device *dev, bool write_protect)
 {
 	struct qspi_nor_data *const driver_data = dev->driver_data;
-	int ret;
+	const struct qspi_nor_config *params = dev->config->config_info;
+
+	int ret = qspi_set_active_mem(dev);
+	if (ret != 0) {
+		return ret;
+	}
+	struct qspi_cmd cmd = {
+		.op_code = ((write_protect) ? QSPI_NOR_CMD_WRDI : QSPI_NOR_CMD_WREN),
+		.tx_buf = NULL,
+		.rx_buf = NULL
+	};
+
+	driver_data->write_protection = write_protect;
 
 	SYNC_LOCK();
 
-//	spi_nor_wait_until_ready(dev);
-	ret = qspi_cmd_xfer(driver_data->qspi, &driver_data->qspi_cfg, NULL, 0, NULL ,0 , ((write_protect) ?
-		      QSPI_NOR_CMD_WRDI : QSPI_NOR_CMD_WREN), 0);
+	if(qspi_send_cmd(driver_data->qspi, &cmd) != 0){
+		ret = -EIO;
+	}
 
-#if DT_INST_0_JEDEC_QSPI_NOR_JEDEC_ID_0 == 0xbf && DT_INST_0_JEDEC_QSPI_NOR_JEDEC_ID_1 == 0x26
-//	if (ret == 0 && !write_protect) {
-//		ret = qspi_nor_cmd_write(dev, SPI_NOR_CMD_MCHP_UNLOCK);
-//	}
-#endif
+	if (params->id[0] == 0xbf && params->id[1] == 0x26 && ret == 0 && !write_protect) {
+		cmd.op_code = QSPI_NOR_CMD_MCHP_UNLOCK;
+		ret = qspi_send_cmd(driver_data->qspi, &cmd);
+	}
 
 	SYNC_UNLOCK();
 
@@ -202,34 +230,23 @@ static int qspi_nor_configure(struct device *dev)
 	struct qspi_nor_data *data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
 
-	data->qspi = device_get_binding(DT_NORDIC_NRF_QSPI_QSPI_0_LABEL);
+	data->qspi = device_get_binding(DT_INST_0_JEDEC_QSPI_NOR_BUS_NAME);
 	if (!data->qspi) {
+		printk("errq");
 		return -EINVAL;
 	}
 
-	data->qspi_cfg.frequency = 8000000;
-	data->qspi_cfg.operation = (	QSPI_CS_DELAY_SET(8) 								|
-									QSPI_DATA_LINES_SET(QSPI_DATA_LINES_QUAD)			|
-									QSPI_ADDRESS_MODE_SET(QSPI_ADDRESS_MODE_24BIT));
-
-//#ifdef DT_INST_0_JEDEC_SPI_NOR_CS_GPIOS_CONTROLLER
-//	data->cs_ctrl.gpio_dev =
-//		device_get_binding(DT_INST_0_JEDEC_SPI_NOR_CS_GPIOS_CONTROLLER);
-//	if (!data->cs_ctrl.gpio_dev) {
-//		return -ENODEV;
-//	}
-//
-//	data->cs_ctrl.gpio_pin = DT_INST_0_JEDEC_SPI_NOR_CS_GPIOS_PIN;
-//	data->cs_ctrl.delay = CONFIG_SPI_NOR_CS_WAIT_DELAY;
-//QSPI_STD_CMD_JEDEC_ID
-//	data->spi_cfg.cs = &data->cs_ctrl;
-//#endif /* DT_INST_0_JEDEC_SPI_NOR_CS_GPIOS_CONTROLLER */
+	int ret = qspi_set_active_mem(dev);
+	if (ret != 0) {
+		printk("errs");
+		return ret;
+	}
 
 	/* now the spi bus is configured, we can verify the flash id */
 	if (qspi_nor_read_id(dev, params) != 0) {
-//		return -ENODEV;
+		printk("erri");
+		return -ENODEV;
 	}
-
 
 	return 0;
 }
@@ -243,7 +260,7 @@ static int qspi_nor_configure(struct device *dev)
 static int qspi_nor_init(struct device *dev)
 {
 	SYNC_INIT();
-
+	printk("Init nor\n");
 	return qspi_nor_configure(dev);
 }
 
@@ -285,15 +302,34 @@ static const struct flash_driver_api qspi_nor_api = {
 	.write_block_size = 1,
 };
 
+
+#define DATA_LINES(lines) \
+	lines == 4 ? QSPI_DATA_LINES_QUAD :	\
+	lines == 2 ? QSPI_DATA_LINES_DOUBLE :	\
+	lines == 1 ? QSPI_DATA_LINES_SINGLE : -1
+
+#define ADDRESS_SIZE(mode) \
+	mode == 32 ? QSPI_ADDRESS_MODE_32BIT :	\
+	mode == 24 ? QSPI_ADDRESS_MODE_24BIT :	\
+	mode == 16 ? QSPI_ADDRESS_MODE_16BIT :	\
+	mode == 8 ? QSPI_ADDRESS_MODE_8BIT : -1
+
 static const struct qspi_nor_config flash_id = {
 	.id = DT_INST_0_JEDEC_QSPI_NOR_JEDEC_ID,
-#ifdef DT_INST_0_JEDEC_QSPI_NOR_HAS_BE32K
-	.has_be32k = true,
-#endif /* DT_INST_0_JEDEC_QSPI_NOR_HAS_BE32K */
+	.has_be32k = DT_INST_0_JEDEC_QSPI_NOR_HAS_BE32K,
 	.size = DT_INST_0_JEDEC_QSPI_NOR_SIZE / 8,
 };
 
-static struct qspi_nor_data qspi_nor_memory_data;
+static struct qspi_nor_data qspi_nor_memory_data = {
+	.qspi_cfg = {
+		.cs_pin = DT_INST_0_JEDEC_QSPI_NOR_CS_PIN,
+		.frequency = DT_INST_0_JEDEC_QSPI_NOR_FREQUENCY,
+		.mode = DT_INST_0_JEDEC_QSPI_NOR_QSPI_MODE,
+		.cs_high_time = DT_INST_0_JEDEC_QSPI_NOR_CS_HIGH_TIME,
+		.data_lines = DATA_LINES(DT_INST_0_JEDEC_QSPI_NOR_DATA_LINES),
+		.address = ADDRESS_SIZE(DT_INST_0_JEDEC_QSPI_NOR_ADDRESS_SIZE)
+	}
+};
 
 DEVICE_AND_API_INIT(qspi_flash_memory, DT_INST_0_JEDEC_QSPI_NOR_LABEL,
 		    &qspi_nor_init, &qspi_nor_memory_data,
