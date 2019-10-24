@@ -436,12 +436,15 @@ int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config){
 
 	int rescode = 0;
 	qspi_fill_init_struct(config, &QSPIconfig);
+	nrfx_qspi_uninit();
 	rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
-	if (rescode != 0) {
+	if (rescode != NRFX_SUCCESS) {
 		if (rescode == NRFX_ERROR_TIMEOUT) {
 			return -ETIMEDOUT;
 		} else if (rescode == NRFX_ERROR_INVALID_STATE) {
-			return ECANCELED;
+			return -ECANCELED;
+		} else if (rescode == NRFX_ERROR_INVALID_PARAM) {
+			return -EINVAL;
 		} else {
 			return -EINVAL;
 		}
