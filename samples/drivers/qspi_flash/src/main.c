@@ -95,7 +95,9 @@ void main(void)
 	qspi_config(&qspi_cfg);
 
 	/* Set configuration of the driver */
-	qspi_configure(qspi, &qspi_cfg);
+	if( qspi_configure(qspi, &qspi_cfg) != 0){
+		printk("\nInitialisation failed");
+	}
 
 	u8_t txbuffer[8]={1,2,3,4,1,2,3,4};
 	u8_t rxbuffer[8]={0};
@@ -383,9 +385,9 @@ void blink3(void)
 }
 
 
-K_THREAD_DEFINE(blink1_id, STACKSIZE, blink1, NULL, NULL, NULL,
-		PRIORITY, 0, 200);
-K_THREAD_DEFINE(blink2_id, STACKSIZE, blink2, NULL, NULL, NULL,
-		PRIORITY, 0, 300);
+//K_THREAD_DEFINE(blink1_id, STACKSIZE, blink1, NULL, NULL, NULL,
+//		PRIORITY, 0, 200);
+//K_THREAD_DEFINE(blink2_id, STACKSIZE, blink2, NULL, NULL, NULL,
+//		PRIORITY, 0, 300);
 //K_THREAD_DEFINE(blink3_id, STACKSIZE, blink3, NULL, NULL, NULL,
 //		PRIORITY, 0, 300);
