@@ -1,4 +1,4 @@
-# Copyright (c) 2017 - 2018, Nordic Semiconductor ASA
+# Copyright (c) 2019, Nordic Semiconductor ASA
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -9,8 +9,6 @@ menuconfig QSPI_NRFX
 	depends on SOC_FAMILY_NRF
 	help
 	  Enable support for nrfx QSPI drivers for nRF MCU series.
-	  Peripherals with the same instance ID cannot be used together,
-	  e.g. QSPI_0 and I2C_0. You may need to disable I2C_0 or I2C_1.
 
 if QSPI_NRFX
 
@@ -22,28 +20,8 @@ config QSPI_NRF_QSPI
 	depends on HAS_HW_NRF_QSPI
 	select NRFX_QSPI
 	help
-	  Enable nRF QSPI Master without EasyDMA on port 0.
-
-config QSPI_0_NRF_QSPI
-	bool "nRF QSPI 0"
-	depends on HAS_HW_NRF_QSPI0
-	select NRFX_QSPI
-	help
-	  Enable nRF QSPI Master without EasyDMA on port 0.
+	  Enable nRF QSPI Master with EasyDMA.
 
 endchoice
-
-if QSPI_0_NRF_QSPI
-
-config QSPI_0_NRF_ORC
-	hex "QSPI Port 0 over-read character"
-	range 0x00 0xff
-	default 0xff
-	help
-	  Over-read character. Character clocked out after an over-read
-	  of the transmit buffer.
-
-endif # QSPI_0_NRF_QSPI
-
 
 endif # QSPI_NRFX
