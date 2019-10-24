@@ -227,11 +227,11 @@ arduino_spi: &spi3 {
 		compatible = "jedec,qspi-nor";
 		reg = <0>; 
 		cs-pin = <17>;
-		frequency = <16000000>;
-		qspi-mode = <3>;
-		data-lines = <4>;
+		frequency = <8000000>;
+		qspi-mode = <0>;
+		data-lines = <1>;
 		address-size = <24>;
-		cs-high-time = <1>;
+		cs-high-time = <0>;
 		label = "MEM1";
 		jedec-id = [c2 28 17];
 		size = <67108864>;
