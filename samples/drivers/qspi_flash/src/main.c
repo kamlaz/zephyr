@@ -34,6 +34,8 @@ target_comm_t g_target_comm;
 
 #define QSPI_STD_CMD_JEDEC_ID	0x9F	// CMD: Jedec ID
 #define QSPI_STD_CMD_SE			0x20	// CMD: Sector erase
+#define QSPI_STD_CMD_READ		0x03	// CMD: Read data
+#define QSPI_STD_CMD_WRITE		0x02	// CMD: Read data
 
 #define JEDEC_ID_SIZE			3		// Amount of bytes of JEDEC ID
 //------------		BUFFERS
@@ -53,9 +55,9 @@ struct qspi_cmd cmdBuff;
 struct qspi_buf txBuff;
 struct device *qspi;				// Defines pointer to qspi device
 struct qspi_config qspi_cfg;		// Config for qspi device
-
-
-#define STACKSIZE 1024
+u8_t rxbuffer_1[1024]={0};
+u8_t rxbuffer_2[512]={0};
+u8_t rxbuffer_3[2048]={0};
 
 /* scheduling priority used by each thread */
 static struct k_poll_signal async_sig = K_POLL_SIGNAL_INITIALIZER(async_sig);
@@ -92,34 +94,69 @@ void main(void)
 	}
 
 	/* Assign config */
-	qspi_config(&qspi_cfg);
+	qspi_config(&qspi_cfg);//K_THREAD_DEFINE(blink3_id, STACKSIZE, blink3, NULL, NULL, NULL,
+	//		PRIORITY, 0, 300);
+	//
+	//K_THREAD_DEFINE(blink4_id, STACKSIZE, blink4, NULL, NULL, NULL,
+	//		PRIORITY, 1, 300);
+	//
+	//K_THREAD_DEFINE(blink5_id, STACKSIZE, blink5, NULL, NULL, NULL,
+	//		PRIORITY, 0, 300);
 
 	/* Set configuration of the driver */
 	if( qspi_configure(qspi, &qspi_cfg) != 0){
 		printk("\nInitialisation failed");
 	}
 
-	u8_t txbuffer[8]={1,2,3,4,1,2,3,4};
+	u8_t txbuffer[8]={0,0,0,4,5,6,7,8};
 	u8_t rxbuffer[8]={0};
 	u8_t jedecId = 0x9F;
 	struct qspi_buf txBuff = {
 			.buf = &txbuffer,
-			.len = 8
+			.len = 4
 	};
 
 	struct qspi_buf rxBuff = {
-			.buf = rxbuffer,
-			.len = 8
+			.buf = &rxbuffer,
+			.len = 4
 	};
 
 	struct qspi_cmd cmdBuff = {
-			.op_code = 0x9F,
-			.tx_buf = NULL,
+			.op_code = QSPI_STD_CMD_WRITE,
+			.tx_buf = &txBuff,
+			.rx_buf = NULL,
 	};
-//	qspi_send_cmd(qspi, &cmdBuff, &rxBuff);
-	qspi_erase(qspi,0,0x1000U);
-	qspi_write(qspi, &txBuff, 0);
-	qspi_read(qspi, &rxBuff, 0);
+//	if(qspi_send_cmd(qspi, &cmdBuff) != 0){
+	if(qspi_send_cmd_async(qspi, &cmdBuff, &async_sig) != 0){
+		printk("\nTRANSFER FAILED");
+	}
+	int result = 0;
+	printk("\nErasing...");
+	result = qspi_erase_async(qspi, 0, 0x1000U, &async_sig);
+	if ( result != 0){
+		printk("ERROR: %d", result);
+	}
+	else{
+		printk("OK");
+	}
+
+	printk("\nWritting...");
+	result = qspi_write_async(qspi, &txBuff, 0, &async_sig);
+	if( result != 0){
+		printk("ERROR: %d", result);
+	}
+	else{
+		printk("OK");
+	}
+
+	printk("\nReading...");
+	result = qspi_read_async(qspi, &rxBuff, 0, &async_sig);
+	if( result != 0){
+		printk("ERROR: %d", result);
+	}
+	else{
+		printk("OK");
+	}
 	printk("\nCHlosta");
 //	/* Identify the flash */
 //	LOG_INF("Vendor ID: %x", read_device_id());
@@ -149,7 +186,7 @@ void main(void)
 // */
 static void qspi_config(struct qspi_config * pCfg){
 	pCfg->cs_pin = DT_NORDIC_NRF_QSPI_40029000_JEDEC_QSPI_NOR_0_CS_PIN;
-	pCfg->frequency = 8000000;
+	pCfg->frequency = 1000000;
 	pCfg->data_lines = QSPI_DATA_LINES_SINGLE;/* size of stack area used by each thread */
 #define STACKSIZE 1024
 
@@ -313,7 +350,7 @@ uint32_t memory_test(uint32_t length){
 // * This tests changes QSPI configuration and check
 // *
 // * @param length	length of the tests in bytes
-// * @retval 0 If successful, errno code otherwise.
+// * @retval 0 If successful, errno code otherwise.VSUP
 // */
 //uint32_t memory_complex_test(uint32_t length){
 //	uint32_t result = 0;
@@ -377,10 +414,61 @@ void blink2(void)
 }
 void blink3(void)
 {
-//	blink(PORT1, 1000, LED1, 1);
 	while(1){
-		printk("\n TASK3");
-		k_sleep(500);
+		printk("\nReading_1...");
+//		u8_t rxbuffer_1[256]={0};
+		int result = 0;
+		struct qspi_buf rxBuff = {
+				.buf = &rxbuffer_1,
+				.len = 1024
+		};
+		result = qspi_read_async(qspi, &rxBuff, 0, &async_sig);
+		if( result != 0){
+			printk("ERROR: %d", result);
+		}
+		else{
+			printk("OK");
+		}
+	}
+}
+
+void blink4(void)
+{
+	while(1){
+		printk("\nReading_2...");
+//		u8_t rxbuffer_2[1024]={0};
+		int result = 0;
+		struct qspi_buf rxBuff = {
+				.buf = &rxbuffer_2,
+				.len = 512
+		};
+		result = qspi_read_async(qspi, &rxBuff, 0, &async_sig);
+		if( result != 0){
+			printk("ERROR: %d", result);
+		}
+		else{
+			printk("OK");
+		}
+	}
+}
+
+void blink5(void)
+{
+	while(1){
+		printk("\nReading_3...");
+
+		int result = 0;
+		struct qspi_buf rxBuff = {
+				.buf = &rxbuffer_3,
+				.len = 2048
+		};
+		result = qspi_read_async(qspi, &rxBuff, 0, &async_sig);
+		if( result != 0){
+			printk("ERROR: %d", result);
+		}
+		else{
+			printk("OK");
+		}
 	}
 }
 
@@ -389,5 +477,11 @@ void blink3(void)
 //		PRIORITY, 0, 200);
 //K_THREAD_DEFINE(blink2_id, STACKSIZE, blink2, NULL, NULL, NULL,
 //		PRIORITY, 0, 300);
-//K_THREAD_DEFINE(blink3_id, STACKSIZE, blink3, NULL, NULL, NULL,
-//		PRIORITY, 0, 300);
+K_THREAD_DEFINE(blink3_id, STACKSIZE, blink3, NULL, NULL, NULL,
+		PRIORITY, 0, 300);
+
+K_THREAD_DEFINE(blink4_id, STACKSIZE, blink4, NULL, NULL, NULL,
+		PRIORITY, 1, 300);
+
+K_THREAD_DEFINE(blink5_id, STACKSIZE, blink5, NULL, NULL, NULL,
+		PRIORITY, 0, 300);
