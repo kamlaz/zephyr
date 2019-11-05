@@ -74,8 +74,10 @@ int qspi_erase_internal(struct device *dev, u32_t addr, u32_t size);
 int qspi_send_cmd_internal(struct device *dev, const struct qspi_cmd *cmd);
 
 int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config);
-int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address);
-int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t address);
+int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf,
+		u32_t address);
+int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf,
+		u32_t address);
 int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_cmd *cmd);
 int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size);
 
@@ -87,11 +89,10 @@ int qspi_nrfx_erase_async(struct device *dev, u32_t addr, u32_t size, struct k_p
 #endif /* CONFIG_QSPI_ASYNC */
 
 
-static inline void qspi_fill_init_struct(const struct qspi_config * config,nrfx_qspi_config_t * initStruct);
+static inline void qspi_fill_init_struct(const struct qspi_config *config,
+		nrfx_qspi_config_t *initStruct);
 static inline int get_nrf_qspi_readoc(u8_t data_lines);
 static inline int get_nrf_qspi_wrieoc(u8_t data_lines);
-
-
 static inline int get_nrf_qspi_address_mode(u8_t address);
 static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency);
 
@@ -110,8 +111,7 @@ static const struct qspi_driver_api qspi_nrfx_driver_api = {
 #endif /* CONFIG_QSPI_ASYNC */
 };
 
-static inline struct qspi_nrfx_data *get_dev_data(struct device *dev)
-{
+static inline struct qspi_nrfx_data* get_dev_data(struct device *dev) {
 	return dev->driver_data;
 }
 
@@ -148,8 +148,6 @@ static inline void qspi_wait_for_completion(struct device *dev) {
 /**
  * @brief Get QSPI read operation code
  * Amount of lines used for transfer
-
-
  *
  * @param operation - QSPI config field
  * @retval NRF_QSPI_READOC in case of success or
@@ -402,7 +400,7 @@ int qspi_nrfx_read_async(struct device *dev, const struct qspi_buf *rx_buf, u32_
 	/* Check input parameters */
 	if (!dev) 							{ return -ENXIO;}
 	if (!rx_buf)						{ return -EINVAL;}
-	if (rx_buf->len % sizeof(uint32_t))	{ return -EINVAL;}	//read size must be multiple of 4 bytes
+	if (rx_buf->len % sizeof(uint32_t))	{ return -EINVAL;}	/* read size must be multiple of 4 bytes */
 
 	qspi_lock(dev, async);
 	int rescode = nrfx_qspi_read(rx_buf->buf, rx_buf->len, address);
@@ -436,7 +434,7 @@ int qspi_nrfx_erase_async(struct device *dev, u32_t addr, u32_t size, struct k_p
 	if (!size) 		{ return -EINVAL;}
 
 	qspi_lock(dev, async);
-	return qspi_erase_internal(dev,addr,size);
+	return qspi_erase_internal(dev, addr, size);
 }
 
 //-------------------------------------------------------------------------------------------		COMMON FUNCTIONS
