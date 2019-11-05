@@ -153,8 +153,11 @@ __attribute__((used)) uint32_t memory_test(uint32_t length){
 	}
 	printf("\n Erasing memory...");
 	/* Erase sector */
-
+#if CONFIG_QSPI_ASYNC
+	if(qspi_erase_async(qspi,0 , 0x1000U, &async_sig) != HAL_OK){
+#else
 	if(qspi_erase(qspi,0,0x1000U) != HAL_OK){
+#endif
 		/* Erasing status: ERROR */
 		LOG_WRN("Unable to sector erase");
 		return 2;
@@ -163,15 +166,18 @@ __attribute__((used)) uint32_t memory_test(uint32_t length){
 	printf("\n Reading memory...");
 	/* Chip read */
 
+
+#if CONFIG_QSPI_ASYNC
+	if(qspi_read_async(qspi, &rxBuff, 0, &async_sig) != HAL_OK){
+#else
 	if(qspi_read(qspi, &rxBuff, 0) != HAL_OK){
+#endif
 		/* Reading status: ERROR */
 		LOG_WRN("Unable to read data");
 		return 3;
 	}
 	printf("OK");
 	printf("\n Checking memory...");
-
-//	k_sleep(100);
 
 	/* Memory check -  expect all OXFF */
 	for(uint16_t i = 0; i < length; i++)
@@ -193,7 +199,11 @@ __attribute__((used)) uint32_t memory_test(uint32_t length){
 
 
 	/* Chip write */
+#if CONFIG_QSPI_ASYNC
+	if(qspi_write_async(qspi, &txBuff, 0, &async_sig) != HAL_OK){
+#else
 	if(qspi_write(qspi, &txBuff, 0) != HAL_OK){
+#endif
 		/* Writting status: ERROR */
 		LOG_WRN("Unable to write data");
 		return 5;
@@ -204,8 +214,14 @@ __attribute__((used)) uint32_t memory_test(uint32_t length){
 	/* scheduling priority used by each thread */
 	printf("OK");
 	printf("\n Reading memory...");
+
+
 	/* Chip read */
+#if CONFIG_QSPI_ASYNC
+	if(qspi_read_async(qspi, &rxBuff, 0, &async_sig) != HAL_OK){
+#else
 	if(qspi_read(qspi, &rxBuff, 0) != HAL_OK){
+#endif
 	/* Reading status: ERROR */
 		LOG_WRN("Unable to read data");
 		return 6;
