@@ -5,11 +5,8 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include <sys/__assert.h>
 #include <drivers/qspi.h>
 #include <nrfx_qspi.h>
-#include <stdio.h>
-#include <kernel.h>
 
 
 #define LOG_DOMAIN "qspi_nrfx_qspi"
@@ -17,41 +14,44 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(qspi_nrfx_qspi);
 /* Private define ------------------------------------------------------------*/
-
-/* Page, sector, and block size are standard, not configurable. */
+/* Private macros ------------------------------------------------------------*/
+/**
+ * @brief Gets amount of used data lines
+ */
 #define QSPI_DATA_LINES_FIELD_SIZE	0x03
 #define QSPI_DATA_LINES_GET(_operation_)				\
 	(((_operation_) & QSPI_DATA_LINES_FIELD_SIZE))
 
+/**
+ * @brief Gets size of the address field
+ */
 #define QSPI_ADDRESS_FIELD_SIZE	0x03
 #define QSPI_ADDRESS_GET(_operation_)					\
 	(((_operation_) & QSPI_ADDRESS_FIELD_SIZE))
 
 /**
- * @brief QSPI Polarity & Phase Modes
+ * @brief QSPI flash memory granularity defines
  */
+#define QSPI_PAGE_SIZE    			0x0100U
+#define QSPI_SECTOR_SIZE  			0x1000U
+#define QSPI_BLOCK_SIZE   			0x10000U
+#define QSPI_BLOCK32_SIZE			0x8000
 
-#define QSPI_NOR_PAGE_SIZE    			0x0100U
-#define QSPI_NOR_SECTOR_SIZE  			0x1000U
-#define QSPI_NOR_BLOCK_SIZE   			0x10000U
-#define QSPI_NOR_BLOCK32_SIZE			0x8000
-
-/* Test whether offset is aligned. */
-#define QSPI_NOR_IS_PAGE_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_PAGE_SIZE - 1U)) == 0)
-#define QSPI_NOR_IS_SECTOR_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_SECTOR_SIZE - 1U)) == 0)
-#define QSPI_NOR_IS_BLOCK_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_BLOCK_SIZE - 1U)) == 0)
-#define QSPI_NOR_IS_BLOCK32_ALIGNED(_ofs) (((_ofs) & (QSPI_NOR_BLOCK32_SIZE - 1U)) == 0)
+/**
+ * @brief Test whether offset is aligned.
+ */
+#define QSPI_IS_PAGE_ALIGNED(_ofs) (((_ofs) & (QSPI_PAGE_SIZE - 1U)) == 0)
+#define QSPI_IS_SECTOR_ALIGNED(_ofs) (((_ofs) & (QSPI_SECTOR_SIZE - 1U)) == 0)
+#define QSPI_IS_BLOCK_ALIGNED(_ofs) (((_ofs) & (QSPI_BLOCK_SIZE - 1U)) == 0)
+#define QSPI_IS_BLOCK32_ALIGNED(_ofs) (((_ofs) & (QSPI_BLOCK32_SIZE - 1U)) == 0)
 
 /* Imported variables --------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-
-/* Structure with basic structure */
 struct qspi_nrfx_data {
 	struct k_sem lock;
-	u8_t   busy;
 	int status;
 	struct k_poll_signal internal_signal;
-	struct k_poll_event events;
+	struct k_poll_event internal_events;
 #ifdef CONFIG_QSPI_ASYNC
 	struct k_poll_signal *signal;
 #endif /* CONFIG_QSPI_ASYNC */
@@ -61,56 +61,10 @@ struct qspi_nrfx_data {
 #endif
 };
 
-
 /* Main config structure */
-struct qspi_nrfx_config {
-	nrfx_qspi_config_t config;
-};
-//static const struct qspi_nrfx_config qspi_conf;
 static nrfx_qspi_config_t QSPIconfig;
 
-/* Exported types ------------------------------------------------------------*/
-int qspi_erase_internal(struct device *dev, u32_t addr, u32_t size);
-int qspi_send_cmd_internal(struct device *dev, const struct qspi_cmd *cmd);
-
-int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config);
-int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf,
-		u32_t address);
-int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf,
-		u32_t address);
-int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_cmd *cmd);
-int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size);
-
-#ifdef CONFIG_QSPI_ASYNC
-int qspi_nrfx_write_async(struct device *dev, const struct qspi_buf *tx_buf, u32_t address, struct k_poll_signal *async);
-int qspi_nrfx_read_async(struct device *dev, const struct qspi_buf *rx_buf, u32_t address, struct k_poll_signal *async);
-int qspi_nrfx_send_cmd_async(struct device *dev, const struct qspi_cmd *cmd, struct k_poll_signal *async);
-int qspi_nrfx_erase_async(struct device *dev, u32_t addr, u32_t size, struct k_poll_signal *async);
-#endif /* CONFIG_QSPI_ASYNC */
-
-
-static inline void qspi_fill_init_struct(const struct qspi_config *config,
-		nrfx_qspi_config_t *initStruct);
-static inline int get_nrf_qspi_readoc(u8_t data_lines);
-static inline int get_nrf_qspi_wrieoc(u8_t data_lines);
-static inline int get_nrf_qspi_address_mode(u8_t address);
-static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency);
-
-/* API definition */
-static const struct qspi_driver_api qspi_nrfx_driver_api = {
-	.configure = qspi_nrfx_configure,
-	.write = qspi_nrfx_write,
-	.read = qspi_nrfx_read,
-	.send_cmd = qspi_nrfx_send_cmd,
-	.erase = qspi_nrfx_erase,
-#ifdef CONFIG_QSPI_ASYNC
-	.write_async = qspi_nrfx_write_async,
-	.read_async = qspi_nrfx_read_async,
-	.send_cmd_async	= qspi_nrfx_send_cmd_async,
-	.erase_async = qspi_nrfx_erase_async,
-#endif /* CONFIG_QSPI_ASYNC */
-};
-
+/* Function bodies -----------------------------------------------------------*/
 static inline struct qspi_nrfx_data* get_dev_data(struct device *dev) {
 	return dev->driver_data;
 }
@@ -127,21 +81,16 @@ static inline void qspi_lock(struct device *dev,
 
 }
 
-static inline void qspi_unlock(struct device *dev)
-{
+static inline void qspi_unlock(struct device *dev) {
 	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
-#ifdef CONFIG_QSPI_ASYNC
-	k_poll_signal_raise(dev_data->signal, dev_data->status);
-#endif /* CONFIG_QSPI_ASYNC */
 	k_sem_give(&dev_data->lock);
 }
 
-
 static inline void qspi_wait_for_completion(struct device *dev, int status) {
 	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
-	k_poll(&dev_data->events, 1, K_FOREVER);
-	dev_data->events.signal->signaled = 0;
-	dev_data->events.state = K_POLL_STATE_NOT_READY;
+	k_poll(&dev_data->internal_events, 1, K_FOREVER);
+	dev_data->internal_events.signal->signaled = 0;
+	dev_data->internal_events.state = K_POLL_STATE_NOT_READY;
 #if CONFIG_QSPI_ASYNC
 	k_poll_signal_raise(dev_data->signal, status);
 #endif /* CONFIG_QSPI_ASYNC */
@@ -151,16 +100,16 @@ static inline void qspi_wait_for_completion(struct device *dev, int status) {
  * @brief Get QSPI read operation code
  * Amount of lines used for transfer
  *
- * @param operation - QSPI config field
+ * @param data_lines - number of used data lines.
  * @retval NRF_QSPI_READOC in case of success or
  * 		   -EINVAL in case of failure
  */
 static inline int get_nrf_qspi_readoc(u8_t data_lines) {
-	if (QSPI_DATA_LINES_GET(data_lines) 		== QSPI_DATA_LINES_SINGLE) 	{ /**< SINGLE line operation. QSPI_DATA_LINES_SINGLE*/
+	if (QSPI_DATA_LINES_GET(data_lines) 		== QSPI_DATA_LINES_SINGLE) 	{
 		return NRF_QSPI_READOC_FASTREAD;
-	} else if (QSPI_DATA_LINES_GET(data_lines) 	== QSPI_DATA_LINES_DOUBLE) 	{ /**< DOUBLE line operation. QSPI_DATA_LINES_DOUBLE*/
+	} else if (QSPI_DATA_LINES_GET(data_lines) 	== QSPI_DATA_LINES_DOUBLE) 	{
 		return NRF_QSPI_READOC_READ2IO;
-	} else if (QSPI_DATA_LINES_GET(data_lines) 	== QSPI_DATA_LINES_QUAD) 	{ /**< QUAD line operation. QSPI_DATA_LINES_QUAD*/
+	} else if (QSPI_DATA_LINES_GET(data_lines) 	== QSPI_DATA_LINES_QUAD) 	{
 		return NRF_QSPI_READOC_READ4IO;
 	} else {
 		LOG_ERR("Not supported line type");
@@ -169,19 +118,19 @@ static inline int get_nrf_qspi_readoc(u8_t data_lines) {
 }
 
 /**
- * @brief Get QSPI read operation code
+ * @brief Get QSPI write operation code
  * Amount of lines used for transfer
  *
- * @param operation - QSPI config field
- * @retval NRF_QSPI_READOC in case of success or
+ * @param data_lines - number of used data lines.
+ * @retval NRF_QSPI_WRITEOC in case of success or
  * 		   -EINVAL in case of failure
  */
 static inline int get_nrf_qspi_wrieoc(u8_t data_lines) {
-	if (QSPI_DATA_LINES_GET(data_lines) 		== QSPI_DATA_LINES_SINGLE)	{ /**< SINGLE line operation. */
+	if (QSPI_DATA_LINES_GET(data_lines) 		== QSPI_DATA_LINES_SINGLE)	{
 		return NRF_QSPI_WRITEOC_PP;
-	} else if (QSPI_DATA_LINES_GET(data_lines)	== QSPI_DATA_LINES_DOUBLE)	{ /**< DOUBLE line operation. */
+	} else if (QSPI_DATA_LINES_GET(data_lines)	== QSPI_DATA_LINES_DOUBLE)	{
 		return NRF_QSPI_WRITEOC_PP2O;
-	} else if (QSPI_DATA_LINES_GET(data_lines)	== QSPI_DATA_LINES_QUAD) 	{ /**< QUAD line operation. */
+	} else if (QSPI_DATA_LINES_GET(data_lines)	== QSPI_DATA_LINES_QUAD) 	{
 		return NRF_QSPI_WRITEOC_PP4IO;
 	} else {
 		LOG_ERR("Not supported line type");
@@ -191,16 +140,16 @@ static inline int get_nrf_qspi_wrieoc(u8_t data_lines) {
 
 /**
  * @brief Get QSPI address mode
- * Two types of address are avaiable: 24bit or 32bit
+ * Two types of addresses are avaiable: 24bit or 32bit
  *
- * @param operation - QSPI config field
+ * @param address - address config field
  * @retval NRF_SPI_ADDRMODE in case of success or
  * 		   -EINVAL in case of failure
  */
 static inline int get_nrf_qspi_address_mode(u8_t address) {
-	if (QSPI_ADDRESS_GET(address) == QSPI_ADDRESS_MODE_24BIT) { /**< 24 BIT ADDR. */
+	if (QSPI_ADDRESS_GET(address) 			== QSPI_ADDRESS_MODE_24BIT) {
 		return NRF_QSPI_ADDRMODE_24BIT;
-	} else if (QSPI_ADDRESS_GET(address) == QSPI_ADDRESS_MODE_32BIT) { /**< 32 BIT ADDR. */
+	} else if (QSPI_ADDRESS_GET(address) 	== QSPI_ADDRESS_MODE_32BIT) {
 		return NRF_QSPI_ADDRMODE_32BIT;
 	} else {
 		LOG_ERR("Address modes other than 24 or 32 bits are not supported");
@@ -210,9 +159,9 @@ static inline int get_nrf_qspi_address_mode(u8_t address) {
 
 /**
  * @brief Get QSPI prescaler
- * Get the highest supported frequency prescaler not exceeding the requested one.
+ * Get supported frequency prescaler not exceeding the requested one.
  *
- * @param frequency - QSPI config fieldess Memory address to
+ * @param frequency - desired QSPI bus frequency
  * @retval NRF_SPI_PRESCALER in case of success or;
  * 		   -EINVAL in case of failure
  */
@@ -256,8 +205,8 @@ static inline nrf_qspi_frequency_t get_nrf_qspi_prescaler(u32_t frequency)
 /**
  * @brief QSPI handler
  *
- * @param event
- * @param p_context
+ * @param event - driver event type
+ * @param p_context - Pointer to context. Use in interrupt handler.
  * @retval None
  */
 static void qspi_handler(nrfx_qspi_evt_t event, void *p_context) {
@@ -265,49 +214,104 @@ static void qspi_handler(nrfx_qspi_evt_t event, void *p_context) {
 	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
 
 	if (event == NRFX_QSPI_EVENT_DONE) {
-	    k_poll_signal_raise(&dev_data->internal_signal, 0x1);
+		k_poll_signal_raise(&dev_data->internal_signal, 0x1);
 		qspi_unlock(dev);
 	}
 }
+//-------------------------------------------------------------------------------------------		COMMON FUNCTIONS
+/* QSPI custom command - common function for async and pooling */
+int qspi_send_cmd_internal(struct device *dev, const struct qspi_cmd *cmd){
 
-/* Configures QSPI memory for the transfer */
-int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config){
-	if (!dev) 							{ return -ENXIO;}
-	if (!config)						{ return -EINVAL;}
+	nrf_qspi_cinstr_conf_t cinstr_cfg = {
+		.opcode    = cmd->op_code,
+		.io2_level = true,
+		.io3_level = true,
+		.wipwait   = true,
+		.wren      = true
+	};
+	if(cmd->tx_buf && cmd->rx_buf){
+		cinstr_cfg.length = sizeof(cmd->op_code) + cmd->tx_buf->len + cmd->rx_buf->len;
+	}
+	else if(cmd->tx_buf && !(cmd->rx_buf)){
+		cinstr_cfg.length = sizeof(cmd->op_code) + cmd->tx_buf->len;
+	}
+	else if(!(cmd->tx_buf) && (cmd->rx_buf)){
+		cinstr_cfg.length = sizeof(cmd->op_code) + cmd->rx_buf->len;
+	}
+	else{
+		cinstr_cfg.length = sizeof(cmd->op_code);
+	}
 
-	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
-	 k_poll_signal_init(&dev_data->internal_signal);
-
-	int rescode = 0;
-	qspi_fill_init_struct(config, &QSPIconfig);
-	nrfx_qspi_uninit();
-	rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
-	if (rescode != NRFX_SUCCESS) {
-		if (rescode == NRFX_ERROR_TIMEOUT) {
-			return -ETIMEDOUT;
-		} else if (rescode == NRFX_ERROR_INVALID_STATE) {
-			return -ECANCELED;
-		} else if (rescode == NRFX_ERROR_INVALID_PARAM) {
-			return -EINVAL;
-		} else {
-			return -EINVAL;
-		}
+	int rescode =  nrfx_qspi_cinstr_xfer(&cinstr_cfg, cmd->tx_buf->buf, cmd->rx_buf->buf);
+	qspi_unlock(dev);
+	if(rescode != NRFX_SUCCESS){
+		if(rescode == NRFX_ERROR_TIMEOUT) 	return -EBUSY;
+		else if(rescode == NRFX_ERROR_BUSY)	return -EBUSY;
 	}
 	return 0;
 }
 
-//-------------------------------------------------------------------------------------------		POOLING FUNCTIONS
+/* QSPI erase - common function for async and pooling */
+int qspi_erase_internal(struct device *dev, u32_t addr, u32_t size){
+	/* Check input parameters */
+	if (!dev) 		{ return -ENXIO;}
+	if (!size) 		{ return -EINVAL;}
 
+	int rescode = 0;
+
+	while (size) {
+		if (size == 0xFFFFFFFF) {
+			/* chip erase */
+			rescode = nrfx_qspi_chip_erase();
+			size -= 0xFFFFFFFF;
+		} else if ((size >= QSPI_BLOCK_SIZE)
+				&& QSPI_IS_BLOCK_ALIGNED(addr)) {
+			/* 64 KiB block erase */
+			rescode = nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_64KB, addr);
+
+			addr += QSPI_BLOCK_SIZE;
+			size -= QSPI_BLOCK_SIZE;
+			/*
+			 //		} else if ((size >= QSPI_BLOCK32_SIZE)
+			 //				&& QSPI_IS_BLOCK32_ALIGNED(addr)) {
+			 //			/* 32 KiB block erase */
+//			// TODO: ADD FUCTION HERE
+//			addr += QSPI_BLOCK32_SIZE;
+//			size -= QSPI_BLOCK32_SIZE;
+		} else if ((size >= QSPI_SECTOR_SIZE)
+				&& QSPI_IS_SECTOR_ALIGNED(addr)) {
+			/* sector erase */
+			rescode = nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_4KB, addr);
+			addr += QSPI_SECTOR_SIZE;
+			size -= QSPI_SECTOR_SIZE;
+		} else {
+			/* minimal erase size is at least a sector size */
+			qspi_unlock(dev);
+			LOG_DBG("unsupported at 0x%lx size %zu", (long )addr, size);
+			return -EINVAL;
+		}
+	}
+
+	qspi_wait_for_completion(dev, rescode);
+	qspi_unlock(dev);
+	if (rescode != NRFX_SUCCESS) {
+		return -EBUSY;
+	} else {
+		return 0;
+	}
+}
+
+
+//-------------------------------------------------------------------------------------------		POOLING FUNCTIONS
 /* QSPI write in pooling mode */
 int qspi_nrfx_write(struct device *dev, const struct qspi_buf *tx_buf, u32_t address){
 	/* Check input parameters */
 	if (!dev) 							{ return -ENXIO;}
 	if (!tx_buf)						{ return -EINVAL;}
 	if (tx_buf->len % sizeof(uint32_t) ||
-		!(tx_buf->len > 0))				{ return -EINVAL;}	//write size must be multiple of 4 bytes
+		!(tx_buf->len > 0))				{ return -EINVAL;}	/* write size must be multiple of 4 bytes */
 
 	qspi_lock(dev, NULL);
-
 	int rescode = nrfx_qspi_write(tx_buf->buf, tx_buf->len, address);
 	qspi_wait_for_completion(dev, rescode);
 
@@ -330,12 +334,10 @@ int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf, u32_t addr
 	if (!dev) 							{ return -ENXIO;}
 	if (!rx_buf)						{ return -EINVAL;}
 	if (rx_buf->len % sizeof(uint32_t) ||
-		!(rx_buf->len > 0))				{ return -EINVAL;}	//read size must be multiple of 4 bytes
+		!(rx_buf->len > 0))				{ return -EINVAL;}	/* read size must be multiple of 4 bytes */
 
 	qspi_lock(dev, NULL);
-
 	int rescode = nrfx_qspi_read(rx_buf->buf, rx_buf->len, address);
-
 	qspi_wait_for_completion(dev, rescode);
 
 	if (rescode != NRFX_SUCCESS) {
@@ -370,13 +372,13 @@ int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size){
 	return qspi_erase_internal(dev,addr,size);
 }
 //-------------------------------------------------------------------------------------------		ASYNC FUNCTIONS
-
+#ifdef CONFIG_QSPI_ASYNC
 /* QSPI write in asynchronous mode */
 int qspi_nrfx_write_async(struct device *dev, const struct qspi_buf *tx_buf, u32_t address, struct k_poll_signal *async){
 	/* Check input parameters */
 	if (!dev) 							{ return -ENXIO;}
 	if (!tx_buf)						{ return -EINVAL;}
-	if (tx_buf->len % sizeof(uint32_t))	{ return -EINVAL;}	//write size must be multiple of 4 bytes
+	if (tx_buf->len % sizeof(uint32_t))	{ return -EINVAL;}	/* write size must be multiple of 4 bytes */
 
 	qspi_lock(dev, async);
 	int rescode = nrfx_qspi_write(tx_buf->buf, tx_buf->len, address);
@@ -436,90 +438,7 @@ int qspi_nrfx_erase_async(struct device *dev, u32_t addr, u32_t size, struct k_p
 	qspi_lock(dev, async);
 	return qspi_erase_internal(dev, addr, size);
 }
-
-//-------------------------------------------------------------------------------------------		COMMON FUNCTIONS
-/* QSPI custom command - common function for async and pooling */
-int qspi_send_cmd_internal(struct device *dev, const struct qspi_cmd *cmd){
-	int rescode = 0;
-
-	nrf_qspi_cinstr_conf_t cinstr_cfg = {
-		.opcode    = cmd->op_code,
-		.io2_level = true,
-		.io3_level = true,
-		.wipwait   = true,
-		.wren      = true
-	};
-	if(cmd->tx_buf && cmd->rx_buf){
-		cinstr_cfg.length = sizeof(cmd->op_code) + cmd->tx_buf->len + cmd->rx_buf->len;
-	}
-	else if(cmd->tx_buf && !(cmd->rx_buf)){
-		cinstr_cfg.length = sizeof(cmd->op_code) + cmd->tx_buf->len;
-	}
-	else if(!(cmd->tx_buf) && (cmd->rx_buf)){
-		cinstr_cfg.length = sizeof(cmd->op_code) + cmd->rx_buf->len;
-	}
-	else{
-		cinstr_cfg.length = sizeof(cmd->op_code);
-	}
-
-	rescode =  nrfx_qspi_cinstr_xfer(&cinstr_cfg, cmd->tx_buf->buf, cmd->rx_buf->buf);
-	qspi_unlock(dev);
-	if(rescode != NRFX_SUCCESS){
-		if(rescode == NRFX_ERROR_TIMEOUT) 	return -EBUSY;
-		else if(rescode == NRFX_ERROR_BUSY)	return -EBUSY;
-	}
-	return 0;
-}
-
-/* QSPI erase - common function for async and pooling */
-int qspi_erase_internal(struct device *dev, u32_t addr, u32_t size){
-	/* Check input parameters */
-	if (!dev) 		{ return -ENXIO;}
-	if (!size) 		{ return -EINVAL;}
-
-	int rescode = 0;
-
-	while (size) {
-		if (size == 0xFFFFFFFF) {
-			/* chip erase */
-			rescode = nrfx_qspi_chip_erase();
-			size -= 0xFFFFFFFF;
-		} else if ((size >= QSPI_NOR_BLOCK_SIZE)
-				&& QSPI_NOR_IS_BLOCK_ALIGNED(addr)) {
-			/* 64 KiB block erase */
-			rescode = nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_64KB, addr);
-
-			addr += QSPI_NOR_BLOCK_SIZE;
-			size -= QSPI_NOR_BLOCK_SIZE;
-			/*
-			 //		} else if ((size >= QSPI_NOR_BLOCK32_SIZE)
-			 //				&& QSPI_NOR_IS_BLOCK32_ALIGNED(addr)) {
-			 //			/* 32 KiB block erase */
-//			// TODO: ADD FUCTION HERE
-//			addr += QSPI_NOR_BLOCK32_SIZE;
-//			size -= QSPI_NOR_BLOCK32_SIZE;
-		} else if ((size >= QSPI_NOR_SECTOR_SIZE)
-				&& QSPI_NOR_IS_SECTOR_ALIGNED(addr)) {
-			/* sector erase */
-			rescode = nrfx_qspi_erase(NRF_QSPI_ERASE_LEN_4KB, addr);
-			addr += QSPI_NOR_SECTOR_SIZE;
-			size -= QSPI_NOR_SECTOR_SIZE;
-		} else {
-			/* minimal erase size is at least a sector size */
-			qspi_unlock(dev);
-			LOG_DBG("unsupported at 0x%lx size %zu", (long )addr, size);
-			return -EINVAL;
-		}
-	}
-
-	qspi_wait_for_completion(dev, rescode);
-	qspi_unlock(dev);
-	if (rescode != NRFX_SUCCESS) {
-		return -EBUSY;
-	} else {
-		return 0;
-	}
-}
+#endif /* CONFIG_QSPI_ASYNC */
 
 /**
  * @brief Fills inits struct
@@ -557,11 +476,50 @@ static inline void qspi_fill_init_struct(const struct qspi_config * config,nrfx_
 	initStruct->phy_if.dpmen      = false;
 }
 
+/* Configures QSPI memory for the transfer */
+int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config){
+	if (!dev) 							{ return -ENXIO;}
+	if (!config)						{ return -EINVAL;}
+
+	qspi_fill_init_struct(config, &QSPIconfig);
+	nrfx_qspi_uninit();
+	int rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
+	if (rescode != NRFX_SUCCESS) {
+		if (rescode == NRFX_ERROR_TIMEOUT) {
+			return -ETIMEDOUT;
+		} else if (rescode == NRFX_ERROR_INVALID_STATE) {
+			return -ECANCELED;
+		} else if (rescode == NRFX_ERROR_INVALID_PARAM) {
+			return -EINVAL;
+		} else {
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+/* API definition */
+static const struct qspi_driver_api qspi_nrfx_driver_api = {
+	.configure = qspi_nrfx_configure,
+	.write = qspi_nrfx_write,
+	.read = qspi_nrfx_read,
+	.send_cmd = qspi_nrfx_send_cmd,
+	.erase = qspi_nrfx_erase,
+#ifdef CONFIG_QSPI_ASYNC
+	.write_async = qspi_nrfx_write_async,
+	.read_async = qspi_nrfx_read_async,
+	.send_cmd_async	= qspi_nrfx_send_cmd_async,
+	.erase_async = qspi_nrfx_erase_async,
+#endif /* CONFIG_QSPI_ASYNC */
+};
+
+#ifdef CONFIG_DEVICE_POWER_MANAGEMENT
 /* Function for QSPI Power Management handling */
 static int qspi_nrfx_pm_control(void)
 {
 	return 0;
 }
+#endif
 
 #define QSPI_NRFX_QSPI_DEVICE(void)					       						\
 	static int qspi_init(struct device *dev)			       					\
@@ -573,10 +531,10 @@ static int qspi_nrfx_pm_control(void)
 	}																			\
 	static struct qspi_nrfx_data qspi_data = {									\
 		.lock = Z_SEM_INITIALIZER(qspi_data.lock, 1, UINT_MAX),					\
-		.events = K_POLL_EVENT_INITIALIZER(K_POLL_TYPE_SIGNAL,					\
+		.internal_signal = K_POLL_SIGNAL_INITIALIZER(qspi_data.internal_signal),\
+		.internal_events = K_POLL_EVENT_INITIALIZER(K_POLL_TYPE_SIGNAL,			\
 			 K_POLL_MODE_NOTIFY_ONLY,											\
 			 &qspi_data.internal_signal),										\
-		.busy = false,															\
 	};																			\
 	DEVICE_DEFINE(qspi, DT_NORDIC_NRF_QSPI_QSPI_0_LABEL,	       				\
 		      qspi_init,					       								\
