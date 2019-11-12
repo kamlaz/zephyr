@@ -536,7 +536,7 @@ static inline void qspi_fill_init_struct(const struct qspi_config *config,
 					 nrfx_qspi_config_t *initStruct)
 {
 	/* Configure XIP offset */
-	initStruct->xip_offset = NRFX_QSPI_CONFIG_XIP_OFFSET;
+	initStruct->xip_offset = 0;
 
 	/* Configure pins */
 	initStruct->pins.sck_pin = DT_NORDIC_NRF_QSPI_QSPI_0_SCK_PIN;
@@ -547,7 +547,7 @@ static inline void qspi_fill_init_struct(const struct qspi_config *config,
 	initStruct->pins.io3_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO03_PIN;
 
 	/* Configure IRQ priority */
-	initStruct->irq_priority = (uint8_t)NRFX_QSPI_CONFIG_IRQ_PRIORITY;
+	initStruct->irq_priority = (uint8_t)NRFX_QSPI_DEFAULT_CONFIG_IRQ_PRIORITY;
 
 	/* Configure Protocol interface */
 	initStruct->prot_if.readoc = (nrf_qspi_readoc_t) get_nrf_qspi_readoc(
@@ -576,10 +576,16 @@ int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config)
 		return -EINVAL;
 	}
 
+	static u8_t isInitialised;
+
 	qspi_fill_init_struct(config, &QSPIconfig);
-	nrfx_qspi_uninit();
+	if (isInitialised != false) {
+		nrfx_qspi_uninit();
+	}
+
 	int rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
 
+	isInitialised = true;
 	switch (rescode) {
 	case NRFX_SUCCESS:
 		return 0;
