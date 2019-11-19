@@ -14,17 +14,20 @@
 #define FLASH_DEVICE CONFIG_SPI_FLASH_W25QXXDV_DRV_NAME
 #define FLASH_NAME "W25QXXDV"
 #elif (CONFIG_SPI_NOR - 0) || defined(DT_INST_0_JEDEC_SPI_NOR_LABEL)
-#define FLASH_DEVICE DT_INST_0_JEDEC_SPI_NOR_LABEL
+//#define FLASH_DEVICE DT_INST_0_JEDEC_SPI_NOR_LABEL
+#define FLASH_DEVICE DT_NORDIC_NRF_QSPI_40029000_JEDEC_QSPI_NOR_0_LABEL
 #define FLASH_NAME "JEDEC SPI-NOR"
 #else
 #error Unsupported flash driver
 #endif
 
-#define FLASH_TEST_REGION_OFFSET 0xff000
+#define FLASH_TEST_REGION_OFFSET 0x00000
 #define FLASH_SECTOR_SIZE        4096
 #define TEST_DATA_BYTE_0         0x55
 #define TEST_DATA_BYTE_1         0xaa
-#define TEST_DATA_LEN            2
+#define TEST_DATA_BYTE_2         0x55
+#define TEST_DATA_BYTE_3         0xaa
+#define TEST_DATA_LEN            4
 
 void main(void)
 {
@@ -57,10 +60,12 @@ void main(void)
 	}
 
 	printf("\nTest 2: Flash write\n");
-	flash_write_protection_set(flash_dev, false);
+	//flash_write_protection_set(flash_dev, false);
 
 	buf[0] = TEST_DATA_BYTE_0;
 	buf[1] = TEST_DATA_BYTE_1;
+	buf[2] = TEST_DATA_BYTE_2;
+	buf[3] = TEST_DATA_BYTE_3;
 	printf("   Attempted to write %x %x\n", buf[0], buf[1]);
 	if (flash_write(flash_dev, FLASH_TEST_REGION_OFFSET, buf,
 	    TEST_DATA_LEN) != 0) {
