@@ -15,6 +15,7 @@
 
 #include "qspi_nor.h"
 #include "flash_priv.h"
+#include <nrfx_qspi.h>
 
 LOG_MODULE_REGISTER(qspi_nor, CONFIG_FLASH_LOG_LEVEL);
 
@@ -44,7 +45,7 @@ struct qspi_nor_data {
 #endif
 
 //-----------------------------------------------------------------------------------------------------------------------------
-#include <nrfx_qspi.h>
+
 /**
  * @brief Gets amount of used data lines
  */
@@ -644,7 +645,6 @@ static int qspi_set_active_mem(struct device *dev)
 	 * as it is easy to compare and unique for every memory attached.
 	 */
 	if (current_mem != driver_data->qspi_cfg.cs_pin) {
-		//ret = qspi_configure(driver_data->qspi, &driver_data->qspi_cfg);
 		ret = qspi_nrfx_configure(driver_data->qspi, &driver_data->qspi_cfg);
 		current_mem = driver_data->qspi_cfg.cs_pin;
 	}
@@ -680,7 +680,6 @@ static inline int qspi_nor_read_id(struct device *dev,
 		.tx_buf = NULL
 	};
 
-//	if(qspi_send_cmd(driver_data->qspi, &cmd) != 0){
 	if(qspi_nrfx_send_cmd(driver_data->qspi, &cmd) != 0){
 		return -EIO;
 	}
@@ -713,7 +712,6 @@ static int qspi_nor_read(struct device *dev, off_t addr, void *dest,
 	};
 	SYNC_LOCK();
 
-//	ret = qspi_read(driver_data->qspi, &rx_buf, addr);
 	ret = qspi_nrfx_read(driver_data->qspi, &rx_buf, addr);
 
 	SYNC_UNLOCK();
@@ -741,7 +739,6 @@ static int qspi_nor_write(struct device *dev, off_t addr, const void *src,
 	};
 	SYNC_LOCK();
 
-	//ret = qspi_write(driver_data->qspi, &tx_buf, addr);
 	ret = qspi_nrfx_write(driver_data->qspi, &tx_buf, addr);
 
 	SYNC_UNLOCK();
@@ -765,7 +762,7 @@ static int qspi_nor_erase(struct device *dev, off_t addr, size_t size)
 
 	SYNC_LOCK();
 
-//	ret = qspi_erase(driver_data->qspi, addr, size);
+
 	ret = qspi_nrfx_erase(driver_data->qspi, addr, size);
 
 	SYNC_UNLOCK();
@@ -921,9 +918,6 @@ DEVICE_AND_API_INIT(qspi_flash_memory, DT_INST_0_JEDEC_QSPI_NOR_LABEL,
 		    &qspi_nor_init, &qspi_nor_memory_data,
 		    &flash_id, POST_KERNEL, CONFIG_QSPI_NOR_INIT_PRIORITY,
 		    &qspi_nor_api);
-
-
-
 
 //-----------------------------------------------------------------------------------------
 /* API definition */
