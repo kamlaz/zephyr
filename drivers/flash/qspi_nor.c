@@ -31,6 +31,7 @@ struct qspi_nor_data {
 	struct device *qspi;
 	struct qspi_config qspi_cfg;
 	struct k_sem sem;
+	bool write_protection;
 };
 
 #if defined(CONFIG_MULTITHREADING)
@@ -725,6 +726,10 @@ static int qspi_nor_write(struct device *dev, off_t addr, const void *src,
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
 
+	if (driver_data->write_protection) {
+		return -EACCES;
+	}
+
 	int ret = qspi_set_active_mem(dev);
 	if (ret != 0) {
 		return ret;
@@ -743,13 +748,17 @@ static int qspi_nor_write(struct device *dev, off_t addr, const void *src,
 
 	SYNC_UNLOCK();
 
-	return 0;
+	return ret;
 }
 
 static int qspi_nor_erase(struct device *dev, off_t addr, size_t size)
 {
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
+
+	if (driver_data->write_protection) {
+		return -EACCES;
+	}
 
 	int ret = qspi_set_active_mem(dev);
 	if (ret != 0) {
@@ -784,6 +793,8 @@ static int qspi_nor_write_protection_set(struct device *dev, bool write_protect)
 		.tx_buf = NULL,
 		.rx_buf = NULL
 	};
+
+	driver_data->write_protection = write_protect;
 
 	SYNC_LOCK();
 
