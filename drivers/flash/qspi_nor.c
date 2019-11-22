@@ -46,6 +46,26 @@ struct qspi_nor_data {
 #endif
 
 //-----------------------------------------------------------------------------------------------------------------------------
+#define QSPI_MODE(cpol,cpha) \
+	((cpol == 0)&&(cpha == 0)) == 1 ? 0 :	\
+	((cpol == 1)&&(cpha == 1)) == 1 ? 1 : -1
+
+#define DATA_LINES_WRITE(lines) \
+	lines == 3 ? NRF_QSPI_WRITEOC_PP4IO :	\
+	lines == 2 ? NRF_QSPI_WRITEOC_PP4O :	\
+	lines == 1 ? NRF_QSPI_WRITEOC_PP2O :	\
+	lines == 0 ? NRF_QSPI_WRITEOC_PP : -1
+
+#define DATA_LINES_READ(lines) \
+	lines == 4 ? NRF_QSPI_READOC_READ4IO :	\
+	lines == 3 ? NRF_QSPI_READOC_READ4O :	\
+	lines == 2 ? NRF_QSPI_READOC_READ2IO :	\
+	lines == 1 ? NRF_QSPI_READOC_READ2O :	\
+	lines == 0 ? NRF_QSPI_READOC_FASTREAD : -1
+
+#define ADDRESS_SIZE(mode) \
+	mode == 1 ? QSPI_ADDRESS_MODE_32BIT :	\
+	mode == 0 ? QSPI_ADDRESS_MODE_24BIT : -1\
 
 /**
  * @brief Gets amount of used data lines
@@ -584,10 +604,17 @@ static inline void qspi_fill_init_struct(const struct qspi_config *config,
 	initStruct->irq_priority = (uint8_t)NRFX_QSPI_DEFAULT_CONFIG_IRQ_PRIORITY;
 
 	/* Configure Protocol interface */
-	initStruct->prot_if.readoc = (nrf_qspi_readoc_t) get_nrf_qspi_readoc(
-		config->data_lines);
-	initStruct->prot_if.writeoc = (nrf_qspi_writeoc_t) get_nrf_qspi_wrieoc(
-		config->data_lines);
+#ifdef DT_INST_0_NORDIC_QSPI_NOR_READOC_ENUM
+	initStruct->prot_if.readoc = (nrf_qspi_writeoc_t) DATA_LINES_READ(DT_INST_0_NORDIC_QSPI_NOR_READOC_ENUM);
+#else
+	initStruct->prot_if.readoc = NRF_QSPI_READOC_FASTREAD;
+#endif
+
+#ifdef DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM
+	initStruct->prot_if.writeoc = (nrf_qspi_writeoc_t) DATA_LINES_WRITE(DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM);
+#else
+	initStruct->prot_if.writeoc = NRF_QSPI_WRITEOC_PP;
+#endif
 	initStruct->prot_if.addrmode =
 		(nrf_qspi_addrmode_t) get_nrf_qspi_address_mode(config->address);
 	initStruct->prot_if.dpmconfig = false;
@@ -897,14 +924,6 @@ static const struct flash_driver_api qspi_nor_api = {
 };
 
 
-#define DATA_LINES(lines) \
-	lines == 3 ? QSPI_DATA_LINES_QUAD :	\
-	lines == 2 ? QSPI_DATA_LINES_DOUBLE :	\
-	lines == 1 ? QSPI_DATA_LINES_SINGLE : -1
-
-#define ADDRESS_SIZE(mode) \
-	mode == 1 ? QSPI_ADDRESS_MODE_32BIT :	\
-	mode == 0 ? QSPI_ADDRESS_MODE_24BIT : -1\
 
 static const struct qspi_nor_config flash_id = {
 	.id = DT_INST_0_NORDIC_QSPI_NOR_JEDEC_ID,
@@ -916,13 +935,13 @@ static struct qspi_nor_data qspi_nor_memory_data = {
 	.qspi_cfg = {
 		.cs_pin = DT_NORDIC_NRF_QSPI_QSPI_0_CSN_PINS_0,
 		.frequency = DT_INST_0_NORDIC_QSPI_NOR_SCK_FREQUENCY,
-		.mode = 0,
+		.mode = QSPI_MODE(DT_INST_0_NORDIC_QSPI_NOR_CPOL, DT_INST_0_NORDIC_QSPI_NOR_CPHA),
 		.cs_high_time = DT_INST_0_NORDIC_QSPI_NOR_SCK_DELAY,
-#ifdef DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM
-		.data_lines = DATA_LINES(DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM),
-#else
-		.data_lines = QSPI_DATA_LINES_SINGLE,
-#endif
+//#ifdef DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM
+//		.data_lines = DATA_LINES(DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM),
+//#else
+//		.data_lines = QSPI_DATA_LINES_SINGLE,
+//#endif
 		.address = ADDRESS_SIZE(DT_INST_0_NORDIC_QSPI_NOR_BASE_ADDRESS)
 	}
 };

@@ -13,7 +13,8 @@
 		compatible = "nordic,qspi-nor";
 		reg = <0>;
 		writeoc = "pp2o";
-		sck-frequency = <80000000>;
+		readoc = "read2io";
+		sck-frequency = <8000000>;
 		label = "MX25R64";
 		jedec-id = [c2 28 17];
 		size = <67108864>;
