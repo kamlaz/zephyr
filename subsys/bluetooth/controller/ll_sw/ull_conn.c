@@ -38,7 +38,8 @@
 #include "ll_feat.h"
 #include "ll_settings.h"
 
-#define LOG_MODULE_NAME bt_ctlr_llsw_ull_conn
+#define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
+#define LOG_MODULE_NAME bt_ctlr_ull_conn
 #include "common/log.h"
 #include <soc.h>
 #include "hal/debug.h"
@@ -769,7 +770,6 @@ int ull_conn_llcp(struct ll_conn *conn, u32_t ticks_at_expire, u16_t lazy)
 {
 	LL_ASSERT(conn->lll.handle != 0xFFFF);
 
-#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ) || defined(CONFIG_BT_CTLR_PHY)
 	/* Check if no other procedure with instant is requested and not in
 	 * Encryption setup.
 	 */
@@ -782,10 +782,8 @@ int ull_conn_llcp(struct ll_conn *conn, u32_t ticks_at_expire, u16_t lazy)
 
 		/* TODO: Optimize the checks below, maybe have common flag */
 
-		if (0) {
-
 		/* check if connection update procedure is requested */
-		} else if (conn->llcp_cu.ack != conn->llcp_cu.req) {
+		if (conn->llcp_cu.ack != conn->llcp_cu.req) {
 			/* switch to LLCP_CONN_UPD state machine */
 			conn->llcp_type = LLCP_CONN_UPD;
 			conn->llcp_ack -= 2U;
@@ -831,7 +829,6 @@ int ull_conn_llcp(struct ll_conn *conn, u32_t ticks_at_expire, u16_t lazy)
 #endif /* CONFIG_BT_CTLR_PHY */
 		}
 	}
-#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ || CONFIG_BT_CTLR_PHY */
 
 	/* check if procedure is requested */
 	if (((conn->llcp_req - conn->llcp_ack) & 0x03) == 0x02) {
