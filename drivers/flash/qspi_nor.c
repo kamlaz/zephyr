@@ -575,10 +575,10 @@ static inline void qspi_fill_init_struct(const struct qspi_config *config,
 	/* Configure pins */
 	initStruct->pins.sck_pin = DT_NORDIC_NRF_QSPI_QSPI_0_SCK_PIN;
 	initStruct->pins.csn_pin = config->cs_pin;
-	initStruct->pins.io0_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO00_PIN;
-	initStruct->pins.io1_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO01_PIN;
-	initStruct->pins.io2_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO02_PIN;
-	initStruct->pins.io3_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO03_PIN;
+	initStruct->pins.io0_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO_PINS_0;
+	initStruct->pins.io1_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO_PINS_1;
+	initStruct->pins.io2_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO_PINS_2;
+	initStruct->pins.io3_pin = DT_NORDIC_NRF_QSPI_QSPI_0_IO_PINS_3;
 
 	/* Configure IRQ priority */
 	initStruct->irq_priority = (uint8_t)NRFX_QSPI_DEFAULT_CONFIG_IRQ_PRIORITY;
@@ -824,7 +824,7 @@ static int qspi_nor_configure(struct device *dev)
 	struct qspi_nor_data *data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
 
-	data->qspi = device_get_binding(DT_INST_0_JEDEC_QSPI_NOR_BUS_NAME);
+	data->qspi = device_get_binding(DT_INST_0_NORDIC_QSPI_NOR_BUS_NAME);
 	if (!data->qspi) {
 		printk("errq");
 		return -EINVAL;
@@ -861,7 +861,7 @@ static int qspi_nor_init(struct device *dev)
 #if defined(CONFIG_FLASH_PAGE_LAYOUT)
 
 /* instance 0 size in bytes */
-#define INST_0_BYTES (DT_INST_0_JEDEC_QSPI_NOR_SIZE / 8)
+#define INST_0_BYTES (DT_INST_0_NORDIC_QSPI_NOR_SIZE / 8)
 
 /* instance 0 page count */
 #define LAYOUT_PAGES_COUNT (INST_0_BYTES / CONFIG_QSPI_NOR_FLASH_LAYOUT_PAGE_SIZE)
@@ -898,34 +898,36 @@ static const struct flash_driver_api qspi_nor_api = {
 
 
 #define DATA_LINES(lines) \
-	lines == 4 ? QSPI_DATA_LINES_QUAD :	\
+	lines == 3 ? QSPI_DATA_LINES_QUAD :	\
 	lines == 2 ? QSPI_DATA_LINES_DOUBLE :	\
 	lines == 1 ? QSPI_DATA_LINES_SINGLE : -1
 
 #define ADDRESS_SIZE(mode) \
-	mode == 32 ? QSPI_ADDRESS_MODE_32BIT :	\
-	mode == 24 ? QSPI_ADDRESS_MODE_24BIT :	\
-	mode == 16 ? QSPI_ADDRESS_MODE_16BIT :	\
-	mode == 8 ? QSPI_ADDRESS_MODE_8BIT : -1
+	mode == 1 ? QSPI_ADDRESS_MODE_32BIT :	\
+	mode == 0 ? QSPI_ADDRESS_MODE_24BIT : -1\
 
 static const struct qspi_nor_config flash_id = {
-	.id = DT_INST_0_JEDEC_QSPI_NOR_JEDEC_ID,
-	.has_be32k = DT_INST_0_JEDEC_QSPI_NOR_HAS_BE32K,
-	.size = DT_INST_0_JEDEC_QSPI_NOR_SIZE / 8,
+	.id = DT_INST_0_NORDIC_QSPI_NOR_JEDEC_ID,
+	.has_be32k = DT_INST_0_NORDIC_QSPI_NOR_HAS_BE32K,
+	.size = DT_INST_0_NORDIC_QSPI_NOR_SIZE / 8,
 };
 
 static struct qspi_nor_data qspi_nor_memory_data = {
 	.qspi_cfg = {
-		.cs_pin = DT_INST_0_JEDEC_QSPI_NOR_CS_PIN,
-		.frequency = DT_INST_0_JEDEC_QSPI_NOR_FREQUENCY,
-		.mode = DT_INST_0_JEDEC_QSPI_NOR_QSPI_MODE,
-		.cs_high_time = DT_INST_0_JEDEC_QSPI_NOR_CS_HIGH_TIME,
-		.data_lines = DATA_LINES(DT_INST_0_JEDEC_QSPI_NOR_DATA_LINES),
-		.address = ADDRESS_SIZE(DT_INST_0_JEDEC_QSPI_NOR_ADDRESS_SIZE)
+		.cs_pin = DT_NORDIC_NRF_QSPI_QSPI_0_CSN_PINS_0,
+		.frequency = DT_INST_0_NORDIC_QSPI_NOR_SCK_FREQUENCY,
+		.mode = 0,
+		.cs_high_time = DT_INST_0_NORDIC_QSPI_NOR_SCK_DELAY,
+#ifdef DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM
+		.data_lines = DATA_LINES(DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM),
+#else
+		.data_lines = QSPI_DATA_LINES_SINGLE,
+#endif
+		.address = ADDRESS_SIZE(DT_INST_0_NORDIC_QSPI_NOR_BASE_ADDRESS)
 	}
 };
 
-DEVICE_AND_API_INIT(qspi_flash_memory, DT_INST_0_JEDEC_QSPI_NOR_LABEL,
+DEVICE_AND_API_INIT(qspi_flash_memory, DT_INST_0_NORDIC_QSPI_NOR_LABEL,
 		    &qspi_nor_init, &qspi_nor_memory_data,
 		    &flash_id, POST_KERNEL, CONFIG_QSPI_NOR_INIT_PRIORITY,
 		    &qspi_nor_api);

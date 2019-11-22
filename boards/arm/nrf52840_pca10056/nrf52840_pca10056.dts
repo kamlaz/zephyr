@@ -213,32 +213,8 @@ arduino_spi: &spi3 {
 	miso-pin = <46>;
 	mosi-pin = <45>;
 };
+ 
 
-&qspi {
-	compatible = "nordic,nrf-qspi";
-	status = "okay";
-	sck-pin = <19>;
-	io00-pin = <20>;
-	io01-pin = <21>;
-	io02-pin = <22>;
-	io03-pin = <23>; 
-	max-frequency = <32000000>;
-	mem1: mem1@0 {
-		compatible = "jedec,qspi-nor";
-		reg = <0>; 
-		cs-pin = <17>;
-		frequency = <8000000>;
-		qspi-mode = <0>;
-		data-lines = <1>;
-		address-size = <24>;
-		cs-high-time = <0>;
-		label = "MEM1";
-		jedec-id = [c2 28 17];
-		size = <67108864>;
-		has-be32k;
-		has-ddr-mode;
-	};
-};
 
 &flash0 {
 	/*
