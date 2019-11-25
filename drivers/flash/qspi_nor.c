@@ -1,14 +1,11 @@
 /*
  * Copyright (c) 2019, Nordic Semiconductor ASA
  *
- * This driver is heavily inspired from the spi_flash_w25qxxdv.c SPI NOR driver.
- *
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <errno.h>
 #include <drivers/flash.h>
-#include <drivers/qspi.h>
 #include <init.h>
 #include <string.h>
 #include <logging/log.h>
@@ -19,36 +16,17 @@
 
 LOG_MODULE_REGISTER(qspi_nor, CONFIG_FLASH_LOG_LEVEL);
 
-#define QSPI_NOR_MAX_ADDR_WIDTH 4
-
-/**
- * struct qspi_nor_data - Structure for defining the QSPI NOR access
- * @qspi: The QSPI device
- * @qspi_cfg: The QSPI configuration
- * @sem: The semaphore to access to the flash
- */
-struct qspi_nor_data {
-	struct device *qspi;
-	struct qspi_config qspi_cfg;
-	struct k_sem sem;
-	bool write_protection;
-};
-
-#if defined(CONFIG_MULTITHREADING)
-#define SYNC_INIT() k_sem_init(	\
-		&((struct qspi_nor_data *)dev->driver_data)->sem, 1, UINT_MAX)
-#define SYNC_LOCK() k_sem_take(&driver_data->sem, K_FOREVER)
-#define SYNC_UNLOCK() k_sem_give(&driver_data->sem)
-#else
-#define SYNC_INIT()
-#define SYNC_LOCK()
-#define SYNC_UNLOCK()
-#endif
-
-//-----------------------------------------------------------------------------------------------------------------------------
 #define QSPI_MODE(cpol,cpha) \
 	((cpol == 0)&&(cpha == 0)) == 1 ? 0 :	\
 	((cpol == 1)&&(cpha == 1)) == 1 ? 1 : -1
+
+#define IS_USED_WRITE_QUAD_MODE_CHOSEN(lines) \
+	(nrf_qspi_writeoc_t)lines == NRF_QSPI_WRITEOC_PP4IO ? 1 :	\
+	(nrf_qspi_writeoc_t)lines == NRF_QSPI_WRITEOC_PP4O ? 1 : -1
+
+#define IS_USED_READ_QUAD_MODE_CHOSEN(lines) \
+	(nrf_qspi_readoc_t)lines == NRF_QSPI_READOC_READ4IO ? 1 :	\
+	(nrf_qspi_readoc_t)lines == NRF_QSPI_READOC_READ4O ? 1 : -1
 
 #define DATA_LINES_WRITE(lines) \
 	lines == 3 ? NRF_QSPI_WRITEOC_PP4IO :	\
@@ -63,16 +41,9 @@ struct qspi_nor_data {
 	lines == 1 ? NRF_QSPI_READOC_READ2O :	\
 	lines == 0 ? NRF_QSPI_READOC_FASTREAD : -1
 
-#define ADDRESS_SIZE(mode) \
-	mode == 1 ? QSPI_ADDRESS_MODE_32BIT :	\
-	mode == 0 ? QSPI_ADDRESS_MODE_24BIT : -1\
-
-/**
- * @brief Gets amount of used data lines
- */
-#define QSPI_DATA_LINES_FIELD_SIZE      0x03
-#define QSPI_DATA_LINES_GET(_operation_) \
-	(((_operation_) & QSPI_DATA_LINES_FIELD_SIZE))
+#define ADDRESS_SIZE(addr_size) \
+	addr_size == 1 ? NRF_QSPI_ADDRMODE_32BIT :	\
+	addr_size == 0 ? NRF_QSPI_ADDRMODE_24BIT : -1\
 
 /**
  * @brief Gets size of the address field
@@ -82,14 +53,6 @@ struct qspi_nor_data {
 	(((_operation_) & QSPI_ADDRESS_FIELD_SIZE))
 
 /**
- * @brief QSPI flash memory granularity defines
- */
-#define QSPI_PAGE_SIZE                          0x0100U
-#define QSPI_SECTOR_SIZE                        0x1000U
-#define QSPI_BLOCK_SIZE                         0x10000U
-#define QSPI_BLOCK32_SIZE                       0x8000
-
-/**
  * @brief Test whether offset is aligned.
  */
 #define QSPI_IS_PAGE_ALIGNED(_ofs) (((_ofs) & (QSPI_PAGE_SIZE - 1U)) == 0)
@@ -97,15 +60,37 @@ struct qspi_nor_data {
 #define QSPI_IS_BLOCK_ALIGNED(_ofs) (((_ofs) & (QSPI_BLOCK_SIZE - 1U)) == 0)
 #define QSPI_IS_BLOCK32_ALIGNED(_ofs) (((_ofs) & (QSPI_BLOCK32_SIZE - 1U)) == 0)
 
+#if defined(CONFIG_MULTITHREADING)
+#define SYNC_INIT() k_sem_init(	\
+		&((struct qspi_nor_data *)dev->driver_data)->sem, 1, UINT_MAX)
+#define SYNC_LOCK() k_sem_take(&driver_data->sem, K_FOREVER)
+#define SYNC_UNLOCK() k_sem_give(&driver_data->sem)
+#else
+#define SYNC_INIT()
+#define SYNC_LOCK()
+#define SYNC_UNLOCK()
+#endif
+
+
+/**
+ * struct qspi_nor_data - Structure for defining the QSPI NOR access
+ * @qspi: The QSPI device
+ * @qspi_cfg: The QSPI configuration
+ * @sem: The semaphore to access to the flash
+ */
+struct qspi_nor_data {
+	struct device *qspi;
+	struct qspi_config qspi_cfg;
+	struct k_sem sem;
+	bool write_protection;
+};
+
 struct qspi_nrfx_data {
 	struct k_sem lock;
 	bool busy;
 	int status;
 	struct k_poll_signal internal_signal;
 	struct k_poll_event internal_events;
-//#ifdef CONFIG_QSPI_ASYNC
-//	struct k_poll_signal *signal;
-//#endif /* CONFIG_QSPI_ASYNC */
 
 #ifdef CONFIG_DEVICE_POWER_MANAGEMENT
 	u32_t pm_state;
@@ -126,11 +111,6 @@ static inline void qspi_lock(struct device *dev,
 	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
 
 	k_sem_take(&dev_data->lock, K_FOREVER);
-
-#ifdef CONFIG_QSPI_ASYNC
-	dev_data->signal = signal;
-#endif /* CONFIG_QSPI_ASYNC */
-
 }
 
 static inline void qspi_unlock(struct device *dev)
@@ -138,9 +118,6 @@ static inline void qspi_unlock(struct device *dev)
 	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
 
 	k_sem_give(&dev_data->lock);
-#if CONFIG_QSPI_ASYNC
-	k_poll_signal_raise(dev_data->signal, dev_data->status);
-#endif /* CONFIG_QSPI_ASYNC */
 }
 
 static inline void qspi_wait_for_completion(struct device *dev, int status)
@@ -150,77 +127,6 @@ static inline void qspi_wait_for_completion(struct device *dev, int status)
 	k_poll(&dev_data->internal_events, 1, K_FOREVER);
 	dev_data->internal_events.signal->signaled = 0;
 	dev_data->internal_events.state = K_POLL_STATE_NOT_READY;
-}
-
-/**
- * @brief Get QSPI read operation code
- * Amount of lines used for transfer
- *
- * @param data_lines - number of used data lines.
- * @retval NRF_QSPI_READOC in case of success or
- *		   -EINVAL in case of failure
- */
-static inline int get_nrf_qspi_readoc(u8_t data_lines)
-{
-	switch (QSPI_DATA_LINES_GET(data_lines)) {
-	case QSPI_DATA_LINES_SINGLE:
-		return NRF_QSPI_READOC_FASTREAD;
-	case QSPI_DATA_LINES_DOUBLE:
-		return NRF_QSPI_READOC_READ2IO;
-	case QSPI_DATA_LINES_QUAD:
-		return NRF_QSPI_READOC_READ4IO;
-	default: {
-		LOG_ERR("Not supported line type");
-		return -EINVAL;
-	}
-	}
-}
-
-/**
- * @brief Get QSPI write operation code
- * Amount of lines used for transfer
- *
- * @param data_lines - number of used data lines.
- * @retval NRF_QSPI_WRITEOC in case of success or
- *		   -EINVAL in case of failure
- */
-static inline int get_nrf_qspi_wrieoc(u8_t data_lines)
-{
-	switch (QSPI_DATA_LINES_GET(data_lines)) {
-	case QSPI_DATA_LINES_SINGLE:
-		return NRF_QSPI_WRITEOC_PP;
-	case QSPI_DATA_LINES_DOUBLE:
-		return NRF_QSPI_WRITEOC_PP2O;
-	case QSPI_DATA_LINES_QUAD:
-		return NRF_QSPI_WRITEOC_PP4IO;
-	default: {
-		LOG_ERR("Not supported line type");
-		return -EINVAL;
-	}
-	}
-}
-
-/**
- * @brief Get QSPI address mode
- * Two types of addresses are avaiable: 24bit or 32bit
- *
- * @param address - address config field
- * @retval NRF_SPI_ADDRMODE in case of success or
- *		   -EINVAL in case of failure
- */
-static inline int get_nrf_qspi_address_mode(u8_t address)
-{
-	switch (QSPI_ADDRESS_GET(address)) {
-	case QSPI_ADDRESS_MODE_24BIT:
-		return NRF_QSPI_ADDRMODE_24BIT;
-	case QSPI_ADDRESS_MODE_32BIT:
-		return NRF_QSPI_ADDRMODE_32BIT;
-	default: {
-		LOG_ERR("Address modes other than "
-			"24 or 32 bits are not supported");
-		return -EINVAL;
-	}
-	}
 }
 
 /**
@@ -282,11 +188,6 @@ static void qspi_handler(nrfx_qspi_evt_t event, void *p_context)
 
 	if (event == NRFX_QSPI_EVENT_DONE) {
 		k_poll_signal_raise(&dev_data->internal_signal, 0x1);
-#ifdef CONFIG_QSPI_ASYNC
-		if (dev_data->busy == false) {
-			qspi_unlock(dev);
-		}
-#endif /* CONFIG_QSPI_ASYNC */
 	}
 }
 
@@ -339,11 +240,7 @@ int qspi_erase_internal(struct device *dev, u32_t addr, u32_t size)
 	if (!size) {
 		return -EINVAL;
 	}
-#ifdef CONFIG_QSPI_ASYNC
-	struct qspi_nrfx_data *dev_data = get_dev_data(dev);
 
-	dev_data->busy = true;
-#endif /* CONFIG_QSPI_ASYNC */
 	int rescode = 0;
 
 	while (size) {
@@ -372,9 +269,6 @@ int qspi_erase_internal(struct device *dev, u32_t addr, u32_t size)
 		qspi_wait_for_completion(dev, rescode);
 	}
 
-#ifdef CONFIG_QSPI_ASYNC
-	dev_data->busy = false;
-#endif /* CONFIG_QSPI_ASYNC */
 	qspi_unlock(dev);
 	switch (rescode) {
 	case NRFX_SUCCESS:
@@ -453,6 +347,7 @@ int qspi_nrfx_read(struct device *dev, const struct qspi_buf *rx_buf,
 		return -EBUSY;
 	}
 }
+
 /* QSPI send custom command */
 int qspi_nrfx_send_cmd(struct device *dev, const struct qspi_cmd *cmd)
 {
@@ -483,101 +378,6 @@ int qspi_nrfx_erase(struct device *dev, u32_t addr, u32_t size)
 	return qspi_erase_internal(dev, addr, size);
 }
 
-#ifdef CONFIG_QSPI_ASYNC
-/* QSPI write in asynchronous mode */
-int qspi_nrfx_write_async(struct device *dev, const struct qspi_buf *tx_buf,
-			  u32_t address, struct k_poll_signal *async)
-{
-	/* Check input parameters */
-	if (!dev) {
-		return -ENXIO;
-	}
-	if (!tx_buf) {
-		return -EINVAL;
-	}
-	/* write size must be multiple of 4 bytes */
-	if (tx_buf->len % sizeof(uint32_t)) {
-		return -EINVAL;
-	}
-
-	qspi_lock(dev, async);
-	int rescode = nrfx_qspi_write(tx_buf->buf, tx_buf->len, address);
-
-	switch (rescode) {
-	case NRFX_SUCCESS:
-		return 0;
-	case NRFX_ERROR_INVALID_ADDR:
-		return -EINVAL;
-	case NRFX_ERROR_BUSY:
-		return -EBUSY;
-	default:
-		return -EBUSY;
-	}
-}
-
-/* QSPI read in asynchronous mode */
-int qspi_nrfx_read_async(struct device *dev, const struct qspi_buf *rx_buf,
-			 u32_t address, struct k_poll_signal *async)
-{
-	/* Check input parameters */
-	if (!dev) {
-		return -ENXIO;
-	}
-	if (!rx_buf) {
-		return -EINVAL;
-	}
-	/* read size must be multiple of 4 bytes */
-	if (rx_buf->len % sizeof(uint32_t)) {
-		return -EINVAL;
-	}
-
-	qspi_lock(dev, async);
-	int rescode = nrfx_qspi_read(rx_buf->buf, rx_buf->len, address);
-
-	switch (rescode) {
-	case NRFX_SUCCESS:
-		return 0;
-	case NRFX_ERROR_INVALID_ADDR:
-		return -EINVAL;
-	case NRFX_ERROR_BUSY:
-		return -EBUSY;
-	default:
-		return -EBUSY;
-	}
-}
-
-/* QSPI custom command in asynchronous mode */
-int qspi_nrfx_send_cmd_async(struct device *dev, const struct qspi_cmd *cmd,
-			     struct k_poll_signal *async)
-{
-	/* Check input parameters */
-	if (!dev) {
-		return -ENXIO;
-	}
-	if (!cmd) {
-		return -EINVAL;
-	}
-
-	qspi_lock(dev, async);
-	return qspi_send_cmd_internal(dev, cmd);
-}
-
-/* QSPI erase in asynchronous mode */
-int qspi_nrfx_erase_async(struct device *dev, u32_t addr, u32_t size,
-			  struct k_poll_signal *async)
-{
-	/* Check input parameters */
-	if (!dev) {
-		return -ENXIO;
-	}
-	if (!size) {
-		return -EINVAL;
-	}
-
-	qspi_lock(dev, async);
-	return qspi_erase_internal(dev, addr, size);
-}
-#endif /* CONFIG_QSPI_ASYNC */
 
 /**
  * @brief Fills init struct
@@ -616,7 +416,7 @@ static inline void qspi_fill_init_struct(const struct qspi_config *config,
 	initStruct->prot_if.writeoc = NRF_QSPI_WRITEOC_PP;
 #endif
 	initStruct->prot_if.addrmode =
-		(nrf_qspi_addrmode_t) get_nrf_qspi_address_mode(config->address);
+		(nrf_qspi_addrmode_t)config->address;
 	initStruct->prot_if.dpmconfig = false;
 
 	/* Configure physical interface */
@@ -646,6 +446,25 @@ int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config)
 
 	int rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
 
+	/* If quad transfer was choosen - enable it now */
+	if(( IS_USED_WRITE_QUAD_MODE_CHOSEN(QSPIconfig.prot_if.writeoc) == 1) ||
+		(IS_USED_READ_QUAD_MODE_CHOSEN(QSPIconfig.prot_if.readoc) == 1)){
+		u8_t tx[1] = {0};
+		tx[0] |= QSPI_NOR_QE_BIT;
+
+		struct qspi_buf tx_buff = {
+				.buf = tx,
+				.len = sizeof(tx),
+		};
+
+		struct qspi_cmd cmd ={
+			.op_code = QSPI_NOR_CMD_WRSR,
+			.tx_buf = &tx_buff,
+			.rx_buf = NULL,
+		};
+		qspi_nrfx_send_cmd(dev, &cmd);
+	}
+
 	isInitialised = true;
 	switch (rescode) {
 	case NRFX_SUCCESS:
@@ -660,9 +479,6 @@ int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config)
 		return -EBUSY;
 	}
 }
-
-//-----------------------------------------------------------------------------------------------------------------------------
-
 
 static int qspi_set_active_mem(struct device *dev)
 {
@@ -924,7 +740,6 @@ static const struct flash_driver_api qspi_nor_api = {
 };
 
 
-
 static const struct qspi_nor_config flash_id = {
 	.id = DT_INST_0_NORDIC_QSPI_NOR_JEDEC_ID,
 	.has_be32k = DT_INST_0_NORDIC_QSPI_NOR_HAS_BE32K,
@@ -937,12 +752,7 @@ static struct qspi_nor_data qspi_nor_memory_data = {
 		.frequency = DT_INST_0_NORDIC_QSPI_NOR_SCK_FREQUENCY,
 		.mode = QSPI_MODE(DT_INST_0_NORDIC_QSPI_NOR_CPOL, DT_INST_0_NORDIC_QSPI_NOR_CPHA),
 		.cs_high_time = DT_INST_0_NORDIC_QSPI_NOR_SCK_DELAY,
-//#ifdef DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM
-//		.data_lines = DATA_LINES(DT_INST_0_NORDIC_QSPI_NOR_WRITEOC_ENUM),
-//#else
-//		.data_lines = QSPI_DATA_LINES_SINGLE,
-//#endif
-		.address = ADDRESS_SIZE(DT_INST_0_NORDIC_QSPI_NOR_BASE_ADDRESS)
+		.address = ADDRESS_SIZE(DT_INST_0_NORDIC_QSPI_NOR_ADDRESS_SIZE_32)
 	}
 };
 
@@ -951,7 +761,6 @@ DEVICE_AND_API_INIT(qspi_flash_memory, DT_INST_0_NORDIC_QSPI_NOR_LABEL,
 		    &flash_id, POST_KERNEL, CONFIG_QSPI_NOR_INIT_PRIORITY,
 		    &qspi_nor_api);
 
-//-----------------------------------------------------------------------------------------
 /* API definition */
 static const struct qspi_driver_api qspi_nrfx_driver_api = {
 	.configure = qspi_nrfx_configure,
@@ -959,12 +768,6 @@ static const struct qspi_driver_api qspi_nrfx_driver_api = {
 	.read = qspi_nrfx_read,
 	.send_cmd = qspi_nrfx_send_cmd,
 	.erase = qspi_nrfx_erase,
-#ifdef CONFIG_QSPI_ASYNC
-	.write_async = qspi_nrfx_write_async,
-	.read_async = qspi_nrfx_read_async,
-	.send_cmd_async = qspi_nrfx_send_cmd_async,
-	.erase_async = qspi_nrfx_erase_async,
-#endif /* CONFIG_QSPI_ASYNC */
 };
 
 #define QSPI_NRFX_QSPI_DEVICE(void)							 \
@@ -994,4 +797,3 @@ static const struct qspi_driver_api qspi_nrfx_driver_api = {
 #ifdef CONFIG_QSPI_NRF_QSPI
 QSPI_NRFX_QSPI_DEVICE();
 #endif
-//-----------------------------------------------------------------------------------------
