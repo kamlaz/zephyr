@@ -582,7 +582,7 @@ static int qspi_nor_write(struct device *dev, off_t addr, const void *src,
 		return -EINVAL;
 	}
 	struct qspi_buf tx_buf = {
-		.buf = src,
+		.buf = (void *)src,
 		.len = size
 	};
 	SYNC_LOCK();
