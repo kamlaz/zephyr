@@ -24,25 +24,3 @@
 		};
 	};
 };
-
-&mx25r642 {
-	partitions {
-		compatible = "fixed-partitions";
-		#address-cells = <1>;
-		#size-cells = <1>;
-
- 		partition@0 {
-			label = "small";
-			reg = <0x00000000 0x00010000>;
-		};
-		partition@200000 {
-			label = "medium";
-			reg = <0x00010000 0x000F0000>;
-		};
-		partition@220000 {
-			label = "large";
-			reg = <0x00100000 0x00300000>;
-		};
-	};
-};
-
