@@ -21,17 +21,84 @@ Kernel
 Architectures
 *************
 
-* TBD
+* ARM:
+
+  * Added support for memory protection features (user mode and
+    hardware-based stack overflow detection) in ARMv6-M architecture
+  * Added QEMU support for ARMv6-M architecture
+  * Extended test coverage for ARM-specific kernel features in ARMv6-M
+    architecture
+  * Enhanced runtime MPU programming in ARMv8-M architecture, making
+    the full partitioning of kernel SRAM memory a user-configurable
+    feature.
+  * Added CMSIS support for Cortex-R architectures.
+  * Updated CMSIS headers to version 5.6
+  * Added missing Cortex-R CPU device tree bindings.
+  * Fixed incorrect Cortex-R device tree specification.
+  * Fixed several bugs in ARM architecture implementation
+
+* POSIX:
+
+  * Added support for CONFIG_DYNAMIC_INTERRUPTS (native_posix
+    & nrf52_bsim)
 
 Boards & SoC Support
 ********************
 
-* TBD
+* Added support for STM32G4 series
+
+* Added support for these ARM boards:
+
+  .. rst-class:: rst-columns
+
+     * actinius_icarus
+     * cc3235sf_launchxl
+     * decawave_dwm1001_dev
+     * degu_evk
+     * frdm_k22f
+     * frdm_k82f
+     * mec1501modular_assy6885
+     * nrf52833_pca10100
+     * nrf5340_dk_nrf5340
+     * nucleo_g431rb
+     * pico_pi_m4
+     * qemu_cortex_r0
+     * sensortile_box
+     * steval_fcu001v1
+     * stm32f030_demo
+     * stm32l1_disco
+     * twr_kv58f220m
+
+* Added support for these following shields:
+
+  .. rst-class:: rst-columns
+
+     * adafruit_2_8_tft_touch_v2
+     * dfrobot_can_bus_v2_0
+     * link_board_eth
+     * ssd1306_128x32
+     * ssd1306_128x64
+     * waveshare_epaper
+     * x_nucleo_idb05a1
+
+* Added CAN support for Olimexino STM32 board
 
 Drivers and Sensors
 *******************
 
-* TBD
+* CAN
+
+  * Added API to read the bus-state and error counters
+  * Added API for bus-off recovery
+  * Optimizations for the MCP2515 driver
+  * Bug fixes
+
+* EEPROM
+
+  * Added EEPROM device driver API
+  * Added Atmel AT24 (and compatible) I2C EEPROM driver
+  * Added Atmel AT25 (and compatible) SPI EEPROM driver
+  * Added native_posix EEPROM emulation driver
 
 Networking
 **********
