@@ -9,7 +9,7 @@
 
 #include <sys/util.h>
 
-#define QSPI_NOR_MAX_ID_LEN	3
+#define QSPI_NOR_MAX_ID_LEN     3
 
 struct qspi_nor_config {
 	/* JEDEC id from devicetree */
@@ -21,23 +21,23 @@ struct qspi_nor_config {
 };
 
 /* Status register bits */
-#define QSPI_NOR_WIP_BIT         BIT(0)  /* Write in progress */
-#define QSPI_NOR_WEL_BIT         BIT(1)  /* Write enable latch */
-#define QSPI_NOR_QE_BIT          BIT(6)  /* Quad enable enable latch */
+#define QSPI_NOR_WIP_BIT         BIT(0)         /* Write in progress */
+#define QSPI_NOR_WEL_BIT         BIT(1)         /* Write enable latch */
+#define QSPI_NOR_QE_BIT          BIT(6)         /* Quad enable enable latch */
 
 /* Flash opcodes */
-#define QSPI_NOR_CMD_WRSR        0x01    /* Write status register */
-#define QSPI_NOR_CMD_RDSR        0x05    /* Read status register */
-#define QSPI_NOR_CMD_READ        0x03    /* Read data */
-#define QSPI_NOR_CMD_WREN        0x06    /* Write enable */
-#define QSPI_NOR_CMD_WRDI        0x04    /* Write disable */
-#define QSPI_NOR_CMD_PP          0x02    /* Page program */
-#define QSPI_NOR_CMD_SE          0x20    /* Sector erase */
-#define QSPI_NOR_CMD_BE_32K      0x52    /* Block erase 32KB */
-#define QSPI_NOR_CMD_BE          0xD8    /* Block erase */
-#define QSPI_NOR_CMD_CE          0xC7    /* Chip erase */
-#define QSPI_NOR_CMD_RDID        0x9F    /* Read JEDEC ID */
-#define QSPI_NOR_CMD_MCHP_UNLOCK 0x98    /* Microchip: Global unblock */
+#define QSPI_NOR_CMD_WRSR        0x01           /* Write status register */
+#define QSPI_NOR_CMD_RDSR        0x05           /* Read status register */
+#define QSPI_NOR_CMD_READ        0x03           /* Read data */
+#define QSPI_NOR_CMD_WREN        0x06           /* Write enable */
+#define QSPI_NOR_CMD_WRDI        0x04           /* Write disable */
+#define QSPI_NOR_CMD_PP          0x02           /* Page program */
+#define QSPI_NOR_CMD_SE          0x20           /* Sector erase */
+#define QSPI_NOR_CMD_BE_32K      0x52           /* Block erase 32KB */
+#define QSPI_NOR_CMD_BE          0xD8           /* Block erase */
+#define QSPI_NOR_CMD_CE          0xC7           /* Chip erase */
+#define QSPI_NOR_CMD_RDID        0x9F           /* Read JEDEC ID */
+#define QSPI_NOR_CMD_MCHP_UNLOCK 0x98           /* Microchip: Global unblock */
 
 /* Page, sector, and block size are standard, not configurable. */
 
@@ -165,7 +165,7 @@ struct qspi_config {
  * See qspi_configure() for argument descriptions
  */
 typedef int (*qspi_api_configure)(struct device *dev,
-				const struct qspi_config *config);
+				  const struct qspi_config *config);
 
 /**
  * @typedef qspi_api_write
@@ -173,8 +173,8 @@ typedef int (*qspi_api_configure)(struct device *dev,
  * See qspi_write() for argument descriptions
  */
 typedef int (*qspi_api_write)(struct device *dev,
-				const struct qspi_buf *tx_buf,
-				u32_t address);
+			      const struct qspi_buf *tx_buf,
+			      u32_t address);
 
 /**
  * @typedef qspi_api_read
@@ -182,8 +182,8 @@ typedef int (*qspi_api_write)(struct device *dev,
  * See qspi_read() for argument descriptions
  */
 typedef int (*qspi_api_read)(struct device *dev,
-				const struct qspi_buf *rx_buf,
-				u32_t address);
+			     const struct qspi_buf *rx_buf,
+			     u32_t address);
 
 /**
  * @typedef qspi_api_send_cmd
@@ -191,7 +191,7 @@ typedef int (*qspi_api_read)(struct device *dev,
  * See qspi_send_cmd() for argument descriptions
  */
 typedef int (*qspi_api_send_cmd)(struct device *dev,
-				const struct qspi_cmd *cmd);
+				 const struct qspi_cmd *cmd);
 
 /**
  * @typedef qspi_api_erase
@@ -199,8 +199,8 @@ typedef int (*qspi_api_send_cmd)(struct device *dev,
  * See qspi_erase() for argument descriptions
  */
 typedef int (*qspi_api_erase)(struct device *dev,
-				u32_t start_address,
-				u32_t length);
+			      u32_t start_address,
+			      u32_t length);
 
 /**
  * @brief QSPI driver API

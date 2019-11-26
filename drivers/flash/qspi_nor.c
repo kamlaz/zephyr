@@ -16,34 +16,34 @@
 
 LOG_MODULE_REGISTER(qspi_nor, CONFIG_FLASH_LOG_LEVEL);
 
-#define QSPI_MODE(cpol,cpha) \
-	((cpol == 0)&&(cpha == 0)) == 1 ? 0 :	\
-	((cpol == 1)&&(cpha == 1)) == 1 ? 1 : -1
+#define QSPI_MODE(cpol, cpha)			\
+	((cpol == 0) && (cpha == 0)) == 1 ? 0 :	\
+	((cpol == 1) && (cpha == 1)) == 1 ? 1 : -1
 
-#define IS_USED_WRITE_QUAD_MODE_CHOSEN(lines) \
-	(nrf_qspi_writeoc_t)lines == NRF_QSPI_WRITEOC_PP4IO ? 1 :	\
+#define IS_USED_WRITE_QUAD_MODE_CHOSEN(lines)			  \
+	(nrf_qspi_writeoc_t)lines == NRF_QSPI_WRITEOC_PP4IO ? 1 : \
 	(nrf_qspi_writeoc_t)lines == NRF_QSPI_WRITEOC_PP4O ? 1 : -1
 
-#define IS_USED_READ_QUAD_MODE_CHOSEN(lines) \
-	(nrf_qspi_readoc_t)lines == NRF_QSPI_READOC_READ4IO ? 1 :	\
+#define IS_USED_READ_QUAD_MODE_CHOSEN(lines)			  \
+	(nrf_qspi_readoc_t)lines == NRF_QSPI_READOC_READ4IO ? 1 : \
 	(nrf_qspi_readoc_t)lines == NRF_QSPI_READOC_READ4O ? 1 : -1
 
-#define DATA_LINES_WRITE(lines) \
-	lines == 3 ? NRF_QSPI_WRITEOC_PP4IO :	\
-	lines == 2 ? NRF_QSPI_WRITEOC_PP4O :	\
-	lines == 1 ? NRF_QSPI_WRITEOC_PP2O :	\
+#define DATA_LINES_WRITE(lines)		      \
+	lines == 3 ? NRF_QSPI_WRITEOC_PP4IO : \
+	lines == 2 ? NRF_QSPI_WRITEOC_PP4O :  \
+	lines == 1 ? NRF_QSPI_WRITEOC_PP2O :  \
 	lines == 0 ? NRF_QSPI_WRITEOC_PP : -1
 
-#define DATA_LINES_READ(lines) \
-	lines == 4 ? NRF_QSPI_READOC_READ4IO :	\
-	lines == 3 ? NRF_QSPI_READOC_READ4O :	\
-	lines == 2 ? NRF_QSPI_READOC_READ2IO :	\
-	lines == 1 ? NRF_QSPI_READOC_READ2O :	\
+#define DATA_LINES_READ(lines)		       \
+	lines == 4 ? NRF_QSPI_READOC_READ4IO : \
+	lines == 3 ? NRF_QSPI_READOC_READ4O :  \
+	lines == 2 ? NRF_QSPI_READOC_READ2IO : \
+	lines == 1 ? NRF_QSPI_READOC_READ2O :  \
 	lines == 0 ? NRF_QSPI_READOC_FASTREAD : -1
 
-#define ADDRESS_SIZE(addr_size) \
-	addr_size == 1 ? NRF_QSPI_ADDRMODE_32BIT :	\
-	addr_size == 0 ? NRF_QSPI_ADDRMODE_24BIT : -1\
+#define ADDRESS_SIZE(addr_size)			      \
+	addr_size == 1 ? NRF_QSPI_ADDRMODE_32BIT :    \
+	addr_size == 0 ? NRF_QSPI_ADDRMODE_24BIT : -1 \
 
 /**
  * @brief Gets size of the address field
@@ -199,8 +199,8 @@ int qspi_send_cmd_internal(struct device *dev, const struct qspi_cmd *cmd)
 		.opcode = cmd->op_code,
 		.io2_level = true,
 		.io3_level = true,
-		.wipwait = true,
-		.wren = true
+		.wipwait = false,
+		.wren = false
 	};
 
 	if (cmd->tx_buf && cmd->rx_buf) {
@@ -447,17 +447,18 @@ int qspi_nrfx_configure(struct device *dev, const struct qspi_config *config)
 	int rescode = nrfx_qspi_init(&QSPIconfig, qspi_handler, dev);
 
 	/* If quad transfer was choosen - enable it now */
-	if(( IS_USED_WRITE_QUAD_MODE_CHOSEN(QSPIconfig.prot_if.writeoc) == 1) ||
-		(IS_USED_READ_QUAD_MODE_CHOSEN(QSPIconfig.prot_if.readoc) == 1)){
-		u8_t tx[1] = {0};
+	if ((IS_USED_WRITE_QUAD_MODE_CHOSEN(QSPIconfig.prot_if.writeoc) == 1) ||
+	    (IS_USED_READ_QUAD_MODE_CHOSEN(QSPIconfig.prot_if.readoc) == 1)) {
+		u8_t tx[1] = { 0 };
+
 		tx[0] |= QSPI_NOR_QE_BIT;
 
 		struct qspi_buf tx_buff = {
-				.buf = tx,
-				.len = sizeof(tx),
+			.buf = tx,
+			.len = sizeof(tx),
 		};
 
-		struct qspi_cmd cmd ={
+		struct qspi_cmd cmd = {
 			.op_code = QSPI_NOR_CMD_WRSR,
 			.tx_buf = &tx_buff,
 			.rx_buf = NULL,
@@ -485,6 +486,7 @@ static int qspi_set_active_mem(struct device *dev)
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 	static uint16_t current_mem = 0xFFFF;
 	int ret = 0;
+
 	/* We are using CS pin number to identify which memory is selected,
 	 * as it is easy to compare and unique for every memory attached.
 	 */
@@ -504,11 +506,12 @@ static int qspi_set_active_mem(struct device *dev)
  * @return 0 on success, negative errno code otherwise
  */
 static inline int qspi_nor_read_id(struct device *dev,
-				  const struct qspi_nor_config *const flash_id)
+				   const struct qspi_nor_config *const flash_id)
 {
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 
 	int ret = qspi_set_active_mem(dev);
+
 	if (ret != 0) {
 		return ret;
 	}
@@ -524,7 +527,7 @@ static inline int qspi_nor_read_id(struct device *dev,
 		.tx_buf = NULL
 	};
 
-	if(qspi_nrfx_send_cmd(driver_data->qspi, &cmd) != 0){
+	if (qspi_nrfx_send_cmd(driver_data->qspi, &cmd) != 0) {
 		return -EIO;
 	}
 
@@ -536,12 +539,13 @@ static inline int qspi_nor_read_id(struct device *dev,
 }
 
 static int qspi_nor_read(struct device *dev, off_t addr, void *dest,
-			size_t size)
+			 size_t size)
 {
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
 
 	int ret = qspi_set_active_mem(dev);
+
 	if (ret != 0) {
 		return ret;
 	}
@@ -564,7 +568,7 @@ static int qspi_nor_read(struct device *dev, off_t addr, void *dest,
 }
 
 static int qspi_nor_write(struct device *dev, off_t addr, const void *src,
-			 size_t size)
+			  size_t size)
 {
 	struct qspi_nor_data *const driver_data = dev->driver_data;
 	const struct qspi_nor_config *params = dev->config->config_info;
@@ -574,6 +578,7 @@ static int qspi_nor_write(struct device *dev, off_t addr, const void *src,
 	}
 
 	int ret = qspi_set_active_mem(dev);
+
 	if (ret != 0) {
 		return ret;
 	}
@@ -604,6 +609,7 @@ static int qspi_nor_erase(struct device *dev, off_t addr, size_t size)
 	}
 
 	int ret = qspi_set_active_mem(dev);
+
 	if (ret != 0) {
 		return ret;
 	}
@@ -613,7 +619,6 @@ static int qspi_nor_erase(struct device *dev, off_t addr, size_t size)
 	}
 
 	SYNC_LOCK();
-
 
 	ret = qspi_nrfx_erase(driver_data->qspi, addr, size);
 
@@ -628,6 +633,7 @@ static int qspi_nor_write_protection_set(struct device *dev, bool write_protect)
 	const struct qspi_nor_config *params = dev->config->config_info;
 
 	int ret = qspi_set_active_mem(dev);
+
 	if (ret != 0) {
 		return ret;
 	}
@@ -641,7 +647,7 @@ static int qspi_nor_write_protection_set(struct device *dev, bool write_protect)
 
 	SYNC_LOCK();
 
-	if(qspi_nrfx_send_cmd(driver_data->qspi, &cmd) != 0){
+	if (qspi_nrfx_send_cmd(driver_data->qspi, &cmd) != 0) {
 		ret = -EIO;
 	}
 
@@ -674,6 +680,7 @@ static int qspi_nor_configure(struct device *dev)
 	}
 
 	int ret = qspi_set_active_mem(dev);
+
 	if (ret != 0) {
 		printk("errs");
 		return ret;
@@ -720,8 +727,8 @@ static const struct flash_pages_layout dev_layout = {
 #undef LAYOUT_PAGES_COUNT
 
 static void qspi_nor_pages_layout(struct device *dev,
-				 const struct flash_pages_layout **layout,
-				 size_t *layout_size)
+				  const struct flash_pages_layout **layout,
+				  size_t *layout_size)
 {
 	*layout = &dev_layout;
 	*layout_size = 1;

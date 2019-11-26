@@ -62,7 +62,7 @@ void main(void)
 	}
 
 	printf("\nTest 2: Flash write\n");
-	//flash_write_protection_set(flash_dev, false);
+	flash_write_protection_set(flash_dev, false);
 
 	buf[0] = TEST_DATA_BYTE_0;
 	buf[1] = TEST_DATA_BYTE_1;
@@ -70,13 +70,13 @@ void main(void)
 	buf[3] = TEST_DATA_BYTE_3;
 	printf("   Attempted to write %x %x\n", buf[0], buf[1]);
 	if (flash_write(flash_dev, FLASH_TEST_REGION_OFFSET, buf,
-	    TEST_DATA_LEN) != 0) {
+			TEST_DATA_LEN) != 0) {
 		printf("   Flash write failed!\n");
 		return;
 	}
 
 	if (flash_read(flash_dev, FLASH_TEST_REGION_OFFSET, buf,
-	    TEST_DATA_LEN) != 0) {
+		       TEST_DATA_LEN) != 0) {
 		printf("   Flash read failed!\n");
 		return;
 	}
