@@ -8,6 +8,7 @@
 #include <drivers/flash.h>
 #include <device.h>
 #include <stdio.h>
+#include <string.h>
 
 #if (CONFIG_SPI_FLASH_W25QXXDV - 0)
 /* NB: W25Q16DV is a JEDEC spi-nor device, but has a separate driver. */
@@ -16,6 +17,9 @@
 #elif (CONFIG_SPI_NOR - 0) || defined(DT_INST_0_JEDEC_SPI_NOR_LABEL)
 #define FLASH_DEVICE DT_INST_0_JEDEC_SPI_NOR_LABEL
 #define FLASH_NAME "JEDEC SPI-NOR"
+#elif (CONFIG_QSPI_NOR - 0) || defined(DT_INST_0_NORDIC_QSPI_NOR_LABEL)
+#define FLASH_DEVICE DT_INST_0_NORDIC_QSPI_NOR_LABEL
+#define FLASH_NAME "JEDEC QSPI-NOR"
 #else
 #error Unsupported flash driver
 #endif
@@ -24,7 +28,9 @@
 #define FLASH_SECTOR_SIZE        4096
 #define TEST_DATA_BYTE_0         0x55
 #define TEST_DATA_BYTE_1         0xaa
-#define TEST_DATA_LEN            2
+#define TEST_DATA_BYTE_2         0x55
+#define TEST_DATA_BYTE_3         0xaa
+#define TEST_DATA_LEN            4
 
 void main(void)
 {
@@ -61,21 +67,28 @@ void main(void)
 
 	buf[0] = TEST_DATA_BYTE_0;
 	buf[1] = TEST_DATA_BYTE_1;
-	printf("   Attempted to write %x %x\n", buf[0], buf[1]);
+	buf[2] = TEST_DATA_BYTE_2;
+	buf[3] = TEST_DATA_BYTE_3;
+	printf("   Attempted to write %x %x %x %x\n",
+	       buf[0], buf[1], buf[2], buf[3]);
 	if (flash_write(flash_dev, FLASH_TEST_REGION_OFFSET, buf,
-	    TEST_DATA_LEN) != 0) {
+			TEST_DATA_LEN) != 0) {
 		printf("   Flash write failed!\n");
 		return;
 	}
 
+	memset(buf, 0, TEST_DATA_LEN);
+
 	if (flash_read(flash_dev, FLASH_TEST_REGION_OFFSET, buf,
-	    TEST_DATA_LEN) != 0) {
+		       TEST_DATA_LEN) != 0) {
 		printf("   Flash read failed!\n");
 		return;
 	}
-	printf("   Data read %x %x\n", buf[0], buf[1]);
 
-	if ((buf[0] == TEST_DATA_BYTE_0) && (buf[1] == TEST_DATA_BYTE_1)) {
+	printf("   Data read %x %x %x %x\n", buf[0], buf[1], buf[2], buf[3]);
+
+	if ((buf[0] == TEST_DATA_BYTE_0) && (buf[1] == TEST_DATA_BYTE_1) &&
+	    (buf[2] == TEST_DATA_BYTE_2) && (buf[3] == TEST_DATA_BYTE_3)) {
 		printf("   Data read matches with data written. Good!!\n");
 	} else {
 		printf("   Data read does not match with data written!!\n");

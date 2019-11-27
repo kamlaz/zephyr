@@ -213,7 +213,7 @@ arduino_spi: &spi3 {
 	miso-pin = <46>;
 	mosi-pin = <45>;
 };
-
+ 
 &flash0 {
 	/*
 	 * For more information, see:
