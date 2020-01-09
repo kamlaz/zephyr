@@ -9,7 +9,8 @@
 #include <drivers/ipm.h>
 #include <sys/printk.h>
 #include <device.h>
-//
+#include <console/console.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +39,7 @@
 
 #define VDEV_STATUS_ADDR    DT_IPC_SHM_BASE_ADDRESS
 
+static const char prompt[] = "Start typing characters to see them echoed back\r\n";
 
 struct rpmsg_device *rdev;
 
@@ -252,11 +254,53 @@ int rpmsg_platform_init(void) {
 	}
 
 	/* Clean-up */
-	rpmsg_deinit_vdev(&rvdev);
-	metal_finish();
-	printk("OpenAMP demo ended.\n");
+//	rpmsg_deinit_vdev(&rvdev);
+//	metal_finish();
+//	printk("OpenAMP demo ended.\n");
 
 	return 0;
+}
+
+typedef struct{
+	u8_t * name;
+	u8_t id;
+	void(*func)(void);
+}cmd;
+
+const cmd led_on = {
+	.name = "LED_ON",
+	.id = 69,
+};
+
+const cmd led_off = {
+	.name = "LED_OFF",
+	.id = 55,
+};
+
+const cmd command_tab[] = {led_on, led_off};
+
+typedef struct{
+	u8_t buff[64];
+	u8_t idx;
+} buff;
+
+buff console_buffer = {
+		.buff = {0},
+		.idx = 0,
+};
+
+void add_to_buff(buff * buffer, u8_t value){
+	buffer->buff[buffer->idx] = value;
+	buffer->idx++;
+}
+
+u8_t get_buff_len(buff * buffer){
+	return buffer->idx;
+}
+
+void reset_buff(buff * buffer){
+	memset(buffer->buff,0,sizeof(buffer->buff));
+	buffer->idx = 0;
 }
 
 void main(void) {
@@ -264,4 +308,50 @@ void main(void) {
 	if (rpmsg_platform_init() != 0) {
 		printk("Failed to initialise!\n");
 	}
+
+	console_init();
+	printk("You should see another line with instructions below. If not,\n");
+	printk("the (interrupt-driven) console device doesn't work as expected:\n");
+	console_write(NULL, prompt, sizeof(prompt) - 1);
+
+
+	/*
+	 *  save_to_flash
+	 *  read_from_flash
+	 *  led_set(u8_t led_no)
+	 *  led_reset(u8_t led_no)
+	 */
+
+	while (1) {
+		u8_t c = console_getchar();
+		add_to_buff(&console_buffer, c);
+		if (c != '\r') {
+			console_putchar(c);
+		} else {
+			u8_t cmd_found = 0;
+			/* Parsing command */
+			for (u8_t i = 0; i < 2; i++) {
+				if (memcmp(console_buffer.buff, command_tab[i].name,
+						get_buff_len(&console_buffer) - 1) == 0) {
+
+					cmd_found = 1;
+					send_message(command_tab[i].id);
+					break;
+				} else {
+				}
+			}
+			/* ANALYSE RESULT */
+			if (cmd_found) {
+				printk("\n    CMD FOUND\n");
+
+			} else {
+				printk("\n    CMD MISMATCH\n");
+			}
+			reset_buff(&console_buffer);
+		}
+	}
 }
+
+
+
+

@@ -9,7 +9,8 @@
 #include <drivers/ipm.h>
 #include <sys/printk.h>
 #include <device.h>
-//
+#include <drivers/gpio.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,8 +24,14 @@
 #include <metal/device.h>
 #include <metal/alloc.h>
 
-/* Configuration defines */
 
+#define LED_PORT	DT_ALIAS_LED0_GPIOS_CONTROLLER
+#define LED		DT_ALIAS_LED0_GPIOS_PIN
+
+/* 1000 msec = 1 sec */
+#define SLEEP_TIME	1000
+
+/* Shared memory configuration */
 #define SHM_START_ADDR      (DT_IPC_SHM_BASE_ADDRESS + 0x400)
 #define SHM_SIZE            0x7c00
 #define SHM_DEVICE_NAME     "sram0.shm"
@@ -37,22 +44,25 @@
 
 #define VDEV_STATUS_ADDR    DT_IPC_SHM_BASE_ADDRESS
 
+/* Handlers for TX and RX channels */
 static struct device *ipm_tx_handle;
 static struct device *ipm_rx_handle;
 
+/* Semaphores */
 static K_SEM_DEFINE(data_sem, 0, 1);
 static K_SEM_DEFINE(data_rx_sem, 0, 1);
 static K_SEM_DEFINE(ept_sem, 0, 1);
 
 static volatile unsigned int received_data;
-/* End of configuration defines */
+
 
 static metal_phys_addr_t shm_physmap[] = { SHM_START_ADDR };
 static struct metal_device shm_device = {
 		.name = SHM_DEVICE_NAME,
 		.bus = NULL,
 		.num_regions = 1,
-		.regions = {
+		.regions =
+			{
 				{ .virt = (void*) SHM_START_ADDR,
 				.physmap = shm_physmap,
 				.size = SHM_SIZE,
@@ -60,7 +70,8 @@ static struct metal_device shm_device = {
 				.page_mask = 0xffffffff,
 				.mem_flags = 0,
 				.ops = { NULL },
-				}, },
+				},
+			},
 		.node = { NULL },
 		.irq_num = 0,
 		.irq_info = NULL };
@@ -93,9 +104,13 @@ static void virtio_notify(struct virtqueue *vq) {
 	}
 }
 
-const struct virtio_dispatch dispatch = { .get_status = virtio_get_status,
-		.set_status = virtio_set_status, .get_features = virtio_get_features,
-		.set_features = virtio_set_features, .notify = virtio_notify, };
+const struct virtio_dispatch dispatch = {
+		.get_status = virtio_get_status,
+		.set_status = virtio_set_status,
+		.get_features = virtio_get_features,
+		.set_features = virtio_set_features,
+		.notify = virtio_notify,
+};
 
 static void ipm_callback(void *context, u32_t id, volatile void *data) {
 	k_sem_give(&data_sem);
@@ -228,13 +243,16 @@ int rpmsg_platform_init(void) {
 		return err;
 	}
 
+	/* Since we are using name service, we need to wait for a response
+	 * from NS setup and than we need to process it
+	 */
 	k_sem_take(&data_sem, K_FOREVER);
 	virtqueue_notification(vq[0]);
 
 	/* Wait til nameservice ep is setup */
 	k_sem_take(&ept_sem, K_FOREVER);
 
-	printf("Sending msg...\n");
+	printf("Endpoint set successfully.\n");
 
 	while (message < 10) {
 		err = send_message(message);
@@ -250,18 +268,48 @@ int rpmsg_platform_init(void) {
 	}
 
 	/* Clean-up */
-	rpmsg_deinit_vdev(&rvdev);
-	metal_finish();
-	printk("OpenAMP demo ended.\n");
+//	rpmsg_deinit_vdev(&rvdev);
+//	metal_finish();
+//	printk("OpenAMP demo ended.\n");
 
 	return 0;
 }
 
 void main(void) {
+	u32_t cnt = 0;
+	struct device *dev;
+
+	dev = device_get_binding(LED_PORT);
+	/* Set LED pin as output */
+	gpio_pin_configure(dev, LED, GPIO_DIR_OUT);
+
+
 	printf("OpenAMP[application] Start Init\n");
 	if (rpmsg_platform_init() != 0) {
 		printf("Failed to initialise!\n");
 	}
+
+	unsigned int message = 0U;
+	while (1) {
+		message = receive_message();
+		switch(message){
+		case 69:
+			gpio_pin_write(dev, LED, 0);
+			break;
+
+		case 55:
+			gpio_pin_write(dev, LED, 1);
+			break;
+		default:
+			break;
+		}
+
+//		/* Set pin to HIGH/LOW every 1 second */
+//		gpio_pin_write(dev, LED, cnt % 2);
+//		cnt++;
+//		k_sleep(SLEEP_TIME);
+	}
+
 }
 
 /* Make sure we clear out the status flag very early (before we bringup the
