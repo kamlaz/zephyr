@@ -79,12 +79,17 @@ void main(void) {
 		printk("Failed to initialise!\n");
 	}
 
-	console_init();
-	printk("You should see another line with instructions below. If not,\n");
-	printk("the (interrupt-driven) console device doesn't work as expected:\n");
-	console_write(NULL, prompt, sizeof(prompt) - 1);
-
-
+//	console_init();
+//	printk("You should see another line with instructions below. If not,\n");
+//	printk("the (interrupt-driven) console device doesn't work as expected:\n");
+//	console_write(NULL, prompt, sizeof(prompt) - 1);
+//	receive_message();
+	int ret = send_message("dupa", sizeof("dupa"));
+	if (ret < 0) {
+		printk("Failed. ERR: %d", ret);
+	} else {
+		printk("OK");
+	}
 	/*
 	 *  save_to_flash
 	 *  read_from_flash
@@ -92,34 +97,34 @@ void main(void) {
 	 *  led_reset(u8_t led_no)
 	 */
 
-	while (1) {
-		u8_t c = console_getchar();
-		add_to_buff(&console_buffer, c);
-		if (c != '\r') {
-			console_putchar(c);
-		} else {
-			u8_t cmd_found = 0;
-			/* Parsing command */
-			for (u8_t i = 0; i < 2; i++) {
-				if (memcmp(console_buffer.buff, command_tab[i].name,
-						get_buff_len(&console_buffer) - 1) == 0) {
-
-					cmd_found = 1;
-					send_message(command_tab[i].id);
-					break;
-				} else {
-				}
-			}
-			/* ANALYSE RESULT */
-			if (cmd_found) {
-				printk("\n    CMD FOUND\n");
-
-			} else {
-				printk("\n    CMD MISMATCH\n");
-			}
-			reset_buff(&console_buffer);
-		}
-	}
+//	while (1) {
+//		u8_t c = console_getchar();
+//		add_to_buff(&console_buffer, c);
+//		if (c != '\r') {
+//			console_putchar(c);
+//		} else {
+//			u8_t cmd_found = 0;
+//			/* Parsing command */
+//			for (u8_t i = 0; i < 2; i++) {
+//				if (memcmp(console_buffer.buff, command_tab[i].name,
+//						get_buff_len(&console_buffer) - 1) == 0) {
+//
+//					cmd_found = 1;
+//					send_message(command_tab[i].id);
+//					break;
+//				} else {
+//				}
+//			}
+//			/* ANALYSE RESULT */
+//			if (cmd_found) {
+//				printk("\n    CMD FOUND\n");
+//
+//			} else {
+//				printk("\n    CMD MISMATCH\n");
+//			}
+//			reset_buff(&console_buffer);
+//		}
+//	}
 }
 
 

@@ -28,6 +28,14 @@
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME	1000
 
+void printf_buff(u8_t * buff, u8_t size){
+	printf("\nBuff:");
+	for(u8_t i=0; i< size; i++){
+		printf("%c", *buff);
+		buff++;
+	}
+}
+
 
 void main(void) {
 	u32_t cnt = 0;
@@ -44,21 +52,26 @@ void main(void) {
 	}
 
 	unsigned int message = 0U;
+	static unsigned int buff[16]={0};
 	while (1) {
-		message = receive_message();
-		switch(message){
-		case 69:
-			gpio_pin_write(dev, LED, 0);
-			break;
-
-		case 55:
-			gpio_pin_write(dev, LED, 1);
-			break;
-		default:
-			break;
-		}
+		message = receive_message(buff);
+		printf("Got message: %s, size: %d", buff, message);
+		printf_buff(buff,message);
+//		switch(message){
+//		case 69:
+//			gpio_pin_write(dev, LED, 0);
+//			break;
+//
+//		case 55:
+//			gpio_pin_write(dev, LED, 1);
+//			break;
+//		default:
+//			break;
+//		}
 	}
 }
+
+
 
 /* Make sure we clear out the status flag very early (before we bringup the
  * secondary core) so the secondary core see's the proper status

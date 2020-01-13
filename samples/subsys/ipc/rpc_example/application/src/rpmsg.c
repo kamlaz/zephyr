@@ -55,6 +55,8 @@ struct rpmsg_device *rdev;
 #endif
 
 static volatile unsigned int received_data;
+static unsigned int rec_buff[16] = {0};
+static unsigned int rec_len=0;
 
 static metal_phys_addr_t shm_physmap[] = { SHM_START_ADDR };
 static struct metal_device shm_device = {
@@ -118,7 +120,10 @@ static void ipm_callback(void *context, u32_t id, volatile void *data) {
 
 static int endpoint_cb(struct rpmsg_endpoint *ept, void *data, size_t len,
 		u32_t src, void *priv) {
-	received_data = *((unsigned int*) data);
+	printf("Got msg len: %d", len);
+
+	memcpy(rec_buff,data,len);
+	rec_len = len;
 
 	k_sem_give(&data_rx_sem);
 
@@ -137,11 +142,14 @@ static void ns_bind_cb(struct rpmsg_device *rdev, const char *name, u32_t dest) 
 }
 #endif
 
-int send_message(unsigned int message) {
-	return rpmsg_send(&ep, &message, sizeof(message));
+int send_message(u8_t * buff, u8_t len) {
+	return rpmsg_send(&ep, buff, len);
 }
 
-unsigned int receive_message(void) {
+/* @buff rx buffer
+ * @retval number of received bytes
+ * */
+unsigned int receive_message(u8_t * buff) {
 	while (k_sem_take(&data_rx_sem, K_NO_WAIT) != 0) {
 		int status = k_sem_take(&data_sem, K_FOREVER);
 
@@ -153,7 +161,8 @@ unsigned int receive_message(void) {
 #endif
 		}
 	}
-	return received_data;
+	memcpy(buff, rec_buff, rec_len);
+	return rec_len;
 }
 
 int rpmsg_platform_init(void) {
@@ -297,31 +306,46 @@ int rpmsg_platform_init(void) {
 	}
 #endif
 
+
 #if(RMPSG_PROPERTY == MASTER)
-	while (message < 10) {
-		err = send_message(message);
-		if (err < 0) {
-			printk("send_message(%d) failed with status %d\n", message, err);
-		}
-
-		message = receive_message();
-		printk("Master core received a message: %d\n", message);
-
-		message++;
-		k_sleep(100);
+	/* Master has to send first msg */
+	err = rpmsg_send(&ep, "hello!", 6);
+	if (err < 0) {
+		printk("send_message(%d) failed with status %d\n", message, err);
 	}
+	k_sleep(100);
 #else
-	while (message < 9) {
-		message = receive_message();
-		printk("Remote core received a message: %d\n", message);
-
-		message++;
-		err = send_message(message);
-		if (err < 0) {
-			printk("send_message(%d) failed with status %d\n", message, err);
-		}
-	}
+	/* Remote has to receive first msg */
+	u8_t tmp_buff[16]={0};
+	message = receive_message(tmp_buff);
+	printk("Remote core received a message: %d\n", message);
 #endif
+
+//#if(RMPSG_PROPERTY == MASTER)
+//	while (message < 10) {
+//		err = send_message(message);
+//		if (err < 0) {
+//			printk("send_message(%d) failed with status %d\n", message, err);
+//		}
+//
+//		message = receive_message();
+//		printk("Master core received a message: %d\n", message);
+//
+//		message++;
+//		k_sleep(100);
+//	}
+//#else
+//	while (message < 9) {
+//		message = receive_message();
+//		printk("Remote core received a message: %d\n", message);
+//
+//		message++;
+//		err = send_message(message);
+//		if (err < 0) {
+//			printk("send_message(%d) failed with status %d\n", message, err);
+//		}
+//	}
+//#endif
 	return 0;
 }
 
