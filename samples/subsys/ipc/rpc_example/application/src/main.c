@@ -9,6 +9,7 @@
 #include <drivers/ipm.h>
 #include <sys/printk.h>
 #include <device.h>
+#include <console/console.h>
 #include <drivers/gpio.h>
 
 #include <stdio.h>
@@ -36,6 +37,56 @@ void printf_buff(u8_t * buff, u8_t size){
 	}
 }
 
+static const char prompt[] = "Start typing characters to see them echoed back\r\n";
+
+
+
+typedef struct{
+	u8_t * name;
+	u8_t id;
+	void(*func)(void);
+}cmd;
+
+const cmd led_on = {
+	.name = "LED_ON",
+	.id = 69,
+};
+
+const cmd led_off = {
+	.name = "LED_OFF",
+	.id = 55,
+};
+
+const cmd command_tab[] = {led_on, led_off};
+
+typedef struct{
+	u8_t buff[64];
+	u8_t idx;
+} buff;
+
+buff console_buffer = {
+		.buff = {0},
+		.idx = 0,
+};
+
+void add_to_buff(buff * buffer, u8_t value){
+	buffer->buff[buffer->idx] = value;
+	buffer->idx++;
+}
+
+u8_t get_buff_len(buff * buffer){
+	return buffer->idx;
+}
+
+void reset_buff(buff * buffer){
+	memset(buffer->buff,0,sizeof(buffer->buff));
+	buffer->idx = 0;
+}
+
+void rx_callback(u8_t *buffer, size_t len) {
+	printf_buff(buffer, len);
+}
+
 
 void main(void) {
 	u32_t cnt = 0;
@@ -45,29 +96,32 @@ void main(void) {
 	/* Set LED pin as output */
 	gpio_pin_configure(dev, LED, GPIO_DIR_OUT);
 
-
+	ipc_register_rx_callback(rx_callback);
 	printf("OpenAMP[application] Start Init\n");
-	if (rpmsg_platform_init() != 0) {
+	if (ipc_init() != 0) {
 		printf("Failed to initialise!\n");
 	}
 
 	unsigned int message = 0U;
 	static unsigned int buff[16]={0};
+
+	console_init();
+	printk("You should see another line with instructions below. If not,\n");
+	printk("the (interrupt-driven) console device doesn't work as expected:\n");
+	console_write(NULL, prompt, sizeof(prompt) - 1);
+
+
+
 	while (1) {
-		message = receive_message(buff);
-		printf("Got message: %s, size: %d", buff, message);
-		printf_buff(buff,message);
-//		switch(message){
-//		case 69:
-//			gpio_pin_write(dev, LED, 0);
-//			break;
-//
-//		case 55:
-//			gpio_pin_write(dev, LED, 1);
-//			break;
-//		default:
-//			break;
-//		}
+		u8_t c = console_getchar();
+		add_to_buff(&console_buffer, c);
+		if (c != '\r') {
+			console_putchar(c);
+			add_to_buff(buff,c);
+		} else {
+			ipc_transmit(buff, sizeof(buff), 50);
+			reset_buff(buff);
+		}
 	}
 }
 
